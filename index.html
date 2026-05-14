@@ -175,6 +175,7 @@
   .cover img{position:absolute;inset:0;width:100%;height:100%;object-fit:cover}
   .cover.loading:after{content:"finding cover…";position:absolute;left:10px;bottom:10px;z-index:3;background:rgba(5,8,18,.7);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:6px 9px;font-size:.68rem;color:#fff;backdrop-filter:blur(8px)}
   .coverTitle{position:relative;font-weight:900;font-size:clamp(1.2rem,2.2vw,2rem);letter-spacing:-.05em;line-height:.95;text-transform:uppercase;text-shadow:0 6px 22px rgba(0,0,0,.35)}
+  .card[data-needs-poster="false"] .coverTitle{display:none}
   .formatBadge{position:absolute;top:18px;right:18px;background:rgba(5,8,18,.68);border:1px solid rgba(255,255,255,.16);border-radius:999px;padding:7px 10px;font-size:.72rem;font-weight:800;z-index:2;color:#fff;backdrop-filter:blur(8px)}
   .body{padding:14px 16px 16px}
   .title{font-size:1.06rem;font-weight:850;letter-spacing:-.025em;line-height:1.1;margin:0 0 8px}
@@ -766,38 +767,147 @@ async function lookupPosterForForm(prefix){
   if(poster){(isNew?els.newPoster:els.editPoster).value=poster; updateEditPreview(); toast('Poster found.');}
   else toast('No poster found automatically.');
 }
+const _posterFailCache=new Set();
+function _posterKey(title, options){
+  return normalizeSearchText(cleanMovieTitle(title))+'|'+String(options?.section||'').toUpperCase();
+}
 async function findPoster(title, options={}){
+  const key=_posterKey(title, options);
+  if(_posterFailCache.has(key)) return '';
   try{
     if(!options.silent) toast('Searching poster…');
     const queries=buildPosterQueries(title, options);
-    const countries=['US','GB','NO'];
     let best=null;
-    for(const q of queries){
-      for(const country of countries){
-        const urls=[
-          'https://itunes.apple.com/search?media=movie&entity=movie&attribute=movieTerm&limit=18&country='+country+'&term='+encodeURIComponent(q),
-          'https://itunes.apple.com/search?media=movie&entity=movie&limit=18&country='+country+'&term='+encodeURIComponent(q)
-        ];
-        for(const url of urls){
+    // iTunes — US first, GB as fallback. Strict (movieTerm) attribute filter.
+    outer: for(const country of ['US','GB']){
+      for(const q of queries){
+        try{
+          const url='https://itunes.apple.com/search?media=movie&entity=movie&attribute=movieTerm&limit=15&country='+country+'&term='+encodeURIComponent(q);
           const res=await fetch(url);
-          if(!res.ok) continue;
+          if(res.ok){
+            const data=await res.json();
+            for(const r of (data.results||[])){
+              if(!r.artworkUrl100) continue;
+              const score=scorePosterResult(r, title, q, options);
+              if(!best || score>best.score) best={score, result:r};
+            }
+          }
+        }catch(_){}
+        if(best && best.score>=85) break outer;
+      }
+      if(best && best.score>=70) break;
+    }
+    // One broad (no-attribute) iTunes attempt if strict found nothing usable.
+    if(!best || best.score<35){
+      try{
+        const q=queries[0]||cleanMovieTitle(title);
+        const url='https://itunes.apple.com/search?media=movie&entity=movie&limit=15&country=US&term='+encodeURIComponent(q);
+        const res=await fetch(url);
+        if(res.ok){
           const data=await res.json();
           for(const r of (data.results||[])){
             if(!r.artworkUrl100) continue;
             const score=scorePosterResult(r, title, q, options);
-            if(!best || score>best.score) best={score,result:r,query:q,country};
+            if(!best || score>best.score) best={score, result:r};
           }
         }
-        if(best && best.score>=90) break;
-      }
-      if(best && best.score>=90) break;
+      }catch(_){}
     }
-    const art=best?.result?.artworkUrl100;
-    if(art) return upgradeArtworkUrl(art);
-    return await findWikipediaPoster(title, options);
+    if(best && best.score>=35) return upgradeArtworkUrl(best.result.artworkUrl100);
+    const wiki=await findWikipediaPoster(title, options);
+    if(wiki) return wiki;
+    _posterFailCache.add(key);
+    return '';
   }catch(e){
-    try{return await findWikipediaPoster(title, options);}catch(_){return ''}
+    try{
+      const wiki=await findWikipediaPoster(title, options);
+      if(wiki) return wiki;
+    }catch(_){}
+    _posterFailCache.add(key);
+    return '';
   }
+}
+function cleanMovieTitle(t){
+  let s=String(t||'').trim();
+  // Strip trailing "(2)" / "(A)" disambiguation markers used in the catalog
+  s=s.replace(/\s*\((?:\d{1,2}|[A-Z])\)\s*$/,'');
+  // Strip trailing year-in-parens "(1992)"
+  s=s.replace(/\s*\((?:19|20)\d{2}\)\s*$/,'');
+  // Iteratively strip edition/format markers from the end
+  const markers=[
+    'STEELBOOK','LIMITED EDITION','LTD ED','LIMITED','COLLECTORS EDITION','COLLECTOR EDITION','COLL ED','COLLECTORS',
+    'SPECIAL EDITION','REMASTERED','EXTENDED EDITION','EXTENDED CUT','EXTENDED',
+    "DIRECTOR'S CUT",'DIRECTORS CUT','UNRATED CUT','UNRATED','THEATRICAL CUT','THEATRICAL',
+    'DIAMOND EDITION','ANNIVERSARY EDITION','SIGNATURE EDITION',
+    'MASTERS OF CINEMA','CRITERION COLLECTION','CRITERION','ARROW VIDEO','ARROW','88 FILMS','MVD','TRIBECA','SHOUT FACTORY','SCREAM FACTORY','SECOND SIGHT',
+    '3D','4K UHD','4K','UHD','ULTRA HD','BLU-RAY','BLU RAY','BLURAY','DVD','HD-DVD','HDDVD','LD','VHS','DIGIBOOK','DIGIPAK','MEDIABOOK',
+    'VOL\\s*\\d+','VOLUME\\s*\\d+','PART\\s*\\d+','PT\\s*\\d+','DISC\\s*\\d+','DISK\\s*\\d+'
+  ];
+  const re=new RegExp('[\\s\\-–—:/]+(?:'+markers.join('|')+')\\s*$','i');
+  let prev='';
+  while(prev!==s){prev=s; s=s.replace(re,'').trim();}
+  // Trim leftover punctuation
+  s=s.replace(/[\s\-–—:/]+$/,'').trim();
+  return s || String(t||'').trim();
+}
+function normalizeSearchText(t){
+  return String(t||'')
+    .toLowerCase()
+    .replace(/[\u2018\u2019\u201C\u201D]/g,'')
+    .replace(/[^a-z0-9æøåäöüß ]+/g,' ')
+    .replace(/\s+/g,' ')
+    .trim();
+}
+function buildPosterQueries(title, options={}){
+  const raw=String(title||'').trim();
+  const clean=cleanMovieTitle(raw);
+  const sec=String(options.section||'').toUpperCase();
+  const isAnimated=sec.includes('DISNEY') || sec==='TV ROOM' || /\b(DISNEY|PIXAR|DREAMWORKS|GHIBLI|ANIMATED|ANIMATION)\b/i.test(raw+' '+sec);
+  const isLive=/\bLIVE[- ]ACTION\b|\bREMAKE\b/i.test(raw);
+  const queries=[];
+  const push=q=>{q=String(q||'').replace(/\s+/g,' ').trim(); if(q && !queries.includes(q)) queries.push(q);};
+  // Aladdin disambiguation — 1992 animated vs 2019 live action
+  if(/\bALADDIN\b/i.test(raw)){
+    if(isLive) push('Aladdin 2019');
+    else push('Aladdin 1992 Disney');
+  }
+  push(clean);
+  if(clean.split(' ').length<=4) push(clean+' movie');
+  if(isAnimated && !isLive) push(clean+' disney');
+  if(clean!==raw) push(raw);
+  return queries.slice(0,4);
+}
+function scorePosterResult(r, title, query, options={}){
+  const cleanT=normalizeSearchText(cleanMovieTitle(title));
+  const rawT=normalizeSearchText(title);
+  const name=normalizeSearchText(r.trackName || r.collectionName || '');
+  if(!name) return 0;
+  let score=0;
+  if(name===cleanT) score+=60;
+  else if(name===rawT) score+=55;
+  else if(name.startsWith(cleanT+' ') || name.startsWith(cleanT+':')) score+=42;
+  else if(name.includes(cleanT) && cleanT.length>=3) score+=30;
+  else if(cleanT.includes(name) && name.length>=3) score+=22;
+  // Word overlap bonus
+  const tWords=cleanT.split(' ').filter(Boolean);
+  const nWords=new Set(name.split(' ').filter(Boolean));
+  if(tWords.length){
+    const overlap=tWords.filter(w=>nWords.has(w)).length;
+    score += Math.round((overlap/tWords.length)*20);
+  }
+  if(r.kind==='feature-movie') score+=12;
+  // Aladdin: prefer 1992 over 2019 unless title says live action / remake
+  if(/\bALADDIN\b/i.test(title)){
+    const isLive=/LIVE[- ]ACTION|REMAKE/i.test(title);
+    const rel=String(r.releaseDate||'');
+    if(rel.startsWith('1992') && !isLive) score+=25;
+    if(rel.startsWith('2019') && !isLive) score-=20;
+    if(rel.startsWith('2019') && isLive) score+=15;
+  }
+  // Penalize obvious wrong-type matches
+  if(/\bsoundtrack\b|\bscore\b|\boriginal motion picture\b/.test(name) && !/\bsoundtrack\b|\bscore\b/.test(cleanT)) score-=30;
+  if(name.length>cleanT.length*3+10) score-=10;
+  return score;
 }
 async function findWikipediaPoster(title, options={}){
   const queries=buildWikipediaPosterQueries(title, options);
@@ -875,7 +985,7 @@ async function lookupBarcode(code, fillForm=false){
     setScanStatus('Lookup failed. You can still add it manually.');
   }
 }
-function cleanLookupTitle(t){return String(t||'').replace(/\s+(blu[- ]?ray|dvd|4k|uhd|ultra hd).*$/i, m=>m).trim()}
+function cleanLookupTitle(t){return String(t||'').replace(/\s+(?:\(?\s*(?:blu[- ]?ray|dvd|4k|uhd|ultra hd)\s*\)?).*$/i,'').trim()}
 function setScanStatus(msg){els.scanStatus.textContent=msg || ''}
 
 async function startScanner(){
