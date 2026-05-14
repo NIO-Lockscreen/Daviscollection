@@ -254,6 +254,19 @@
   .modalCover{width:110px;aspect-ratio:2/3;border-radius:16px;overflow:hidden;display:flex;align-items:center;justify-content:center;text-align:center;padding:10px;background:linear-gradient(145deg, rgba(125,211,252,.22), rgba(192,132,252,.2));border:1px solid rgba(255,255,255,.13);font-weight:900;text-transform:uppercase;font-size:.75rem}
   .modalCover img{width:100%;height:100%;object-fit:cover}
   .modalPreviewInfo{color:var(--muted);line-height:1.45;font-size:.92rem}
+  .pickerCard{width:min(880px,100%)}
+  .pickerSubtitle{color:var(--muted);font-size:.92rem;margin:0 0 14px;line-height:1.45}
+  .pickerSearchRow,.pickerUrlRow{display:flex;gap:8px;margin:10px 0 14px}
+  .pickerSearchRow input,.pickerUrlRow input{flex:1;background:rgba(255,255,255,.05);border:1px solid var(--line);border-radius:14px;padding:10px 12px;color:var(--text);font:inherit}
+  .pickerSearchRow input:focus,.pickerUrlRow input:focus{outline:none;border-color:rgba(125,211,252,.55)}
+  .pickerStatus{color:var(--muted);font-size:.88rem;min-height:1.4em;margin:2px 0 10px}
+  .pickerGrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px;margin-bottom:8px}
+  .pickerThumb{position:relative;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:18px;overflow:hidden;cursor:pointer;aspect-ratio:2/3;transition:transform .15s ease, border-color .15s ease;padding:0}
+  .pickerThumb:hover{transform:translateY(-2px);border-color:rgba(125,211,252,.55)}
+  .pickerThumb img{width:100%;height:100%;object-fit:cover;display:block}
+  .pickerThumb .src{position:absolute;left:8px;top:8px;background:rgba(5,8,18,.78);border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:4px 8px;font-size:.66rem;font-weight:800;color:#fff;letter-spacing:.02em;backdrop-filter:blur(8px)}
+  .pickerThumb .nm{position:absolute;left:8px;right:8px;bottom:8px;background:rgba(5,8,18,.78);border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:5px 7px;font-size:.7rem;color:#fff;line-height:1.15;backdrop-filter:blur(8px);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-align:left}
+  .pickerEmpty{grid-column:1/-1;text-align:center;color:var(--muted);padding:30px 10px;border:1px dashed rgba(255,255,255,.15);border-radius:18px}
   .actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:14px}
   .empty{padding:40px 18px;text-align:center;color:var(--muted);border:1px dashed rgba(255,255,255,.2);border-radius:28px;background:rgba(255,255,255,.035)}
   .dropZone{border:1px dashed rgba(255,255,255,.25);border-radius:22px;padding:18px;text-align:center;color:var(--muted);background:rgba(255,255,255,.04)}
@@ -275,7 +288,7 @@
     .topbar{grid-template-columns:1fr}.toolbar{justify-content:flex-start}.stats{grid-template-columns:repeat(2,1fr)}.controls{grid-template-columns:1fr 1fr}.toggleRow{justify-content:flex-start}.addWrap{grid-template-columns:1fr}.scanner{min-height:320px}
   }
   @media (max-width:720px){
-    .app{padding:18px 12px 42px}.brand{align-items:flex-start}.logo{width:48px;height:48px;border-radius:17px}h1{font-size:2.35rem}.subtitle{font-size:.92rem}.stats{grid-template-columns:1fr 1fr;gap:10px}.stat{padding:13px;min-height:78px;border-radius:20px}.stat strong{font-size:1.55rem}.controls{position:relative;top:auto;grid-template-columns:1fr;padding:12px;border-radius:22px}.movieGrid{grid-template-columns:1fr 1fr;gap:10px}.card{border-radius:22px}.cover{margin:8px 8px 0;border-radius:17px}.body{padding:10px}.title{font-size:.92rem}.notes,.chip:not(:first-child){display:none}.toolbar .ghost,.toolbar .danger{padding:9px 11px;font-size:.85rem}.formGrid{grid-template-columns:1fr}.panel{border-radius:24px;padding:14px}.scanner{min-height:290px}.movieGrid.compact{border-radius:18px}.movieGrid.compact .card{grid-template-columns:24px minmax(0,1fr);gap:8px;padding:9px 10px}.movieGrid.compact .meta,.movieGrid.compact .formatBadge{display:none}.modalPreview{grid-template-columns:86px 1fr}.modalCover{width:86px}
+    .app{padding:18px 12px 42px}.brand{align-items:flex-start}.logo{width:48px;height:48px;border-radius:17px}h1{font-size:2.35rem}.subtitle{font-size:.92rem}.stats{grid-template-columns:1fr 1fr;gap:10px}.stat{padding:13px;min-height:78px;border-radius:20px}.stat strong{font-size:1.55rem}.controls{position:relative;top:auto;grid-template-columns:1fr;padding:12px;border-radius:22px}.movieGrid{grid-template-columns:1fr 1fr;gap:10px}.card{border-radius:22px}.cover{margin:8px 8px 0;border-radius:17px}.body{padding:10px}.title{font-size:.92rem}.notes,.chip:not(:first-child){display:none}.toolbar .ghost,.toolbar .danger{padding:9px 11px;font-size:.85rem}.formGrid{grid-template-columns:1fr}.panel{border-radius:24px;padding:14px}.scanner{min-height:290px}.movieGrid.compact{border-radius:18px}.movieGrid.compact .card{grid-template-columns:24px minmax(0,1fr);gap:8px;padding:9px 10px}.movieGrid.compact .meta,.movieGrid.compact .formatBadge{display:none}.modalPreview{grid-template-columns:86px 1fr}.modalCover{width:86px}.pickerGrid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:9px}.pickerSearchRow,.pickerUrlRow{flex-direction:column}
   }
 </style>
 </head>
@@ -321,7 +334,6 @@
       <div class="field"><label for="sectionFilter">Section</label><select id="sectionFilter"></select></div>
       <div class="field"><label for="formatFilter">Format</label><select id="formatFilter"></select></div>
       <div class="field"><label for="sortSelect">Sort</label><select id="sortSelect"><option value="title-asc">Title A–Z</option><option value="title-desc">Title Z–A</option><option value="added-desc">Newest added</option><option value="dupes-first">Duplicates first</option></select></div>
-      <div class="toggleRow"><button class="ghost" id="autoLoadCoversBtn">Load missing covers</button></div>
       <div class="toggleRow"><button class="ghost" id="viewToggle">List view</button></div>
     </section>
 
@@ -333,7 +345,7 @@
     <section class="addWrap">
       <div class="panel">
         <h2>Add a movie</h2>
-        <p>Scan the barcode on phone, then choose the exact section where the disc lives. Everything is saved locally in this browser until you export/import a backup. Covers auto-load when a movie card becomes visible.</p>
+        <p>Scan the barcode on phone, then choose the exact section where the disc lives. Everything is saved locally in this browser until you export/import a backup. To attach a cover, click <strong>Find poster</strong> and pick from the candidates.</p>
         <div class="formGrid">
           <div class="field full"><label for="newTitle">Title</label><input id="newTitle" placeholder="Movie title"></div>
           <div class="field"><label for="newSection">Section</label><select id="newSection"></select></div>
@@ -348,7 +360,7 @@
           <button class="ghost" id="barcodeLookupBtn">Lookup barcode</button>
           <button class="primary" id="addMovieBtn">Add to collection</button>
         </div>
-        <div class="hint">Scanner needs HTTPS or localhost. Covers are auto-filled from Apple/iTunes movie artwork when possible; if a cover is wrong, paste your own cover URL.</div>
+        <div class="hint">Scanner needs HTTPS or localhost. Click <strong>Find poster</strong> to open a picker with cover candidates from Apple/iTunes and Wikipedia, or paste your own cover URL.</div>
       </div>
 
       <div class="panel">
@@ -403,6 +415,26 @@
   </div>
 </div>
 
+<div class="modal" id="posterPickerModal" role="dialog" aria-modal="true" aria-labelledby="pickerTitle">
+  <div class="modalCard pickerCard">
+    <div class="modalHead">
+      <h2 id="pickerTitle">Pick a cover</h2>
+      <button class="ghost" id="pickerCloseBtn">Close</button>
+    </div>
+    <p class="pickerSubtitle" id="pickerSubtitle">Tap a poster to use it. If none look right, edit the search term or paste your own URL below.</p>
+    <div class="pickerSearchRow">
+      <input id="pickerSearchInput" placeholder="Search term (edit and press Search)">
+      <button class="ghost" id="pickerSearchBtn">Search</button>
+    </div>
+    <div id="pickerStatus" class="pickerStatus"></div>
+    <div id="pickerGrid" class="pickerGrid"></div>
+    <div class="pickerUrlRow">
+      <input id="pickerUrlInput" placeholder="…or paste a custom cover URL">
+      <button class="primary" id="pickerUrlBtn">Use URL</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script>
@@ -414,12 +446,7 @@ let state = loadState();
 let activeScreen = 'library';
 let compact = localStorage.getItem('movieVault.viewMode') === 'list';
 let editingId = null;
-let posterObserver = null;
-let autoPosterQueue = [];
-let autoPosterRunning = false;
-let autoPosterTotal = 0;
-let autoPosterDone = 0;
-let autoPosterBulk = false;
+let posterPickerState = null;
 let scanStream = null;
 let scanTimer = null;
 let scanDetector = null;
@@ -428,12 +455,17 @@ let quaggaRunning = false;
 
 function $(id){return document.getElementById(id)}
 function init(){
-  ['totalCount','sectionCount','fourKCount','duplicateCount','searchInput','sectionFilter','formatFilter','sortSelect','autoLoadCoversBtn','viewToggle','movieGrid','resultText','newTitle','newSection','customSection','newFormat','newBarcode','newPoster','newNotes','addMovieBtn','posterLookupBtn','barcodeLookupBtn','scanner','scanVideo','scannerText','startScanBtn','stopScanBtn','scanStatus','backupMenuBtn','backupMenu','exportJsonBtn','importBtn','importFile','blueprintPreview','downloadBlueprintBtn','downloadBlueprintTextBtn','printBlueprintBtn','editModal','editPreview','closeModalBtn','editMovieTitle','editSection','editCustomSection','editFormat','editBarcode','editPoster','editNotes','deleteMovieBtn','editPosterLookupBtn','saveEditBtn','toast'].forEach(id=>els[id]=$(id));
+  ['totalCount','sectionCount','fourKCount','duplicateCount','searchInput','sectionFilter','formatFilter','sortSelect','viewToggle','movieGrid','resultText','newTitle','newSection','customSection','newFormat','newBarcode','newPoster','newNotes','addMovieBtn','posterLookupBtn','barcodeLookupBtn','scanner','scanVideo','scannerText','startScanBtn','stopScanBtn','scanStatus','backupMenuBtn','backupMenu','exportJsonBtn','importBtn','importFile','blueprintPreview','downloadBlueprintBtn','downloadBlueprintTextBtn','printBlueprintBtn','editModal','editPreview','closeModalBtn','editMovieTitle','editSection','editCustomSection','editFormat','editBarcode','editPoster','editNotes','deleteMovieBtn','editPosterLookupBtn','saveEditBtn','toast','posterPickerModal','pickerTitle','pickerSubtitle','pickerSearchInput','pickerSearchBtn','pickerStatus','pickerGrid','pickerUrlInput','pickerUrlBtn','pickerCloseBtn'].forEach(id=>els[id]=$(id));
   document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>showScreen(btn.dataset.screen)));
   ['searchInput','sectionFilter','formatFilter','sortSelect'].forEach(id=>els[id].addEventListener('input', render));
   els.viewToggle.textContent=compact?'Cover view':'List view';
   els.viewToggle.addEventListener('click',()=>{compact=!compact; localStorage.setItem('movieVault.viewMode', compact?'list':'cover'); els.viewToggle.textContent=compact?'Cover view':'List view'; render();});
-  els.autoLoadCoversBtn.addEventListener('click',autoLoadAllCovers);
+  els.pickerCloseBtn.addEventListener('click',closePosterPicker);
+  els.posterPickerModal.addEventListener('click',e=>{if(e.target===els.posterPickerModal) closePosterPicker();});
+  els.pickerSearchBtn.addEventListener('click',()=>refreshPickerCandidates(els.pickerSearchInput.value.trim()));
+  els.pickerSearchInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault(); refreshPickerCandidates(els.pickerSearchInput.value.trim());}});
+  els.pickerUrlBtn.addEventListener('click',()=>commitPickerSelection(els.pickerUrlInput.value.trim(),'custom'));
+  els.pickerUrlInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault(); commitPickerSelection(els.pickerUrlInput.value.trim(),'custom');}});
   els.addMovieBtn.addEventListener('click', addMovie);
   els.posterLookupBtn.addEventListener('click',()=>lookupPosterForForm('new'));
   els.barcodeLookupBtn.addEventListener('click',()=>lookupBarcode(els.newBarcode.value.trim(), true));
@@ -594,7 +626,6 @@ function render(){
   }));
   els.movieGrid.querySelectorAll('[data-edit]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation(); openEdit(btn.dataset.edit)}));
   els.movieGrid.querySelectorAll('[data-searchposter]').forEach(btn=>btn.addEventListener('click',async e=>{e.stopPropagation(); await quickPosterLookup(btn.dataset.searchposter)}));
-  if(!compact) initAutoPosterObserver();
 }
 
 function populateStats(){
@@ -670,69 +701,6 @@ function deleteEditingMovie(){
   save(); render(); closeModal(); toast('Movie deleted.');
 }
 
-function initAutoPosterObserver(){
-  if(posterObserver) posterObserver.disconnect();
-  const cards=[...els.movieGrid.querySelectorAll('.card[data-needs-poster="true"]')];
-  if(!cards.length) return;
-  if(!('IntersectionObserver' in window)){
-    cards.slice(0,8).forEach(card=>enqueueAutoPoster(card.dataset.id));
-    return;
-  }
-  posterObserver=new IntersectionObserver(entries=>{
-    entries.forEach(entry=>{
-      if(entry.isIntersecting){
-        posterObserver.unobserve(entry.target);
-        enqueueAutoPoster(entry.target.dataset.id);
-      }
-    });
-  },{rootMargin:'700px 0px'});
-  cards.forEach(card=>posterObserver.observe(card));
-}
-function enqueueAutoPoster(id){
-  if(!id || autoPosterQueue.includes(id)) return;
-  autoPosterQueue.push(id);
-  processAutoPosterQueue();
-}
-async function processAutoPosterQueue(){
-  if(autoPosterRunning) return;
-  autoPosterRunning=true;
-  while(autoPosterQueue.length){
-    const id=autoPosterQueue.shift();
-    const m=state.movies.find(x=>x.id===id);
-    if(m && !m.poster){
-      markCardLoading(id,true);
-      const poster=await findPoster(m.title,{silent:true, section:m.section, format:m.format});
-      markCardLoading(id,false);
-      if(poster){
-        m.poster=poster; m.updated=today(); save(); updateCardPoster(id,poster,m.title);
-      }
-      if(autoPosterBulk){
-        autoPosterDone++;
-        if(autoPosterDone===1 || autoPosterDone%8===0 || autoPosterDone===autoPosterTotal){
-          els.resultText.textContent = `Cover lookup ${autoPosterDone.toLocaleString()} / ${autoPosterTotal.toLocaleString()} checked — ${state.movies.filter(x=>x.poster).length.toLocaleString()} covers saved`;
-        }
-      }
-      await sleep(autoPosterBulk ? 360 : 180);
-    }
-  }
-  autoPosterRunning=false;
-  if(autoPosterBulk){
-    autoPosterBulk=false;
-    render();
-    toast('Cover lookup finished. Some titles may still need manual covers.');
-  }
-}
-function autoLoadAllCovers(){
-  const missing=state.movies.filter(m=>!m.poster).map(m=>m.id);
-  if(!missing.length){toast('All movies already have covers.'); return;}
-  autoPosterQueue=[...new Set([...missing, ...autoPosterQueue])];
-  autoPosterTotal=missing.length;
-  autoPosterDone=0;
-  autoPosterBulk=true;
-  toast(`Looking up ${missing.length.toLocaleString()} missing covers…`);
-  els.resultText.textContent=`Cover lookup started — 0 / ${missing.length.toLocaleString()} checked`;
-  processAutoPosterQueue();
-}
 function markCardLoading(id,on){
   const card=[...els.movieGrid.querySelectorAll('.card')].find(c=>c.dataset.id===id);
   const cover=card?.querySelector('.cover');
@@ -743,89 +711,181 @@ function updateCardPoster(id,poster,title){
   if(!card) return;
   card.dataset.needsPoster='false';
   const cover=card.querySelector('.cover');
-  if(cover && !cover.querySelector('img')){
-    cover.insertAdjacentHTML('afterbegin', `<img src="${escapeHtml(poster)}" alt="Cover for ${escapeHtml(title)}" loading="lazy" onerror="this.remove()">`);
+  if(cover){
+    const existing=cover.querySelector('img');
+    if(existing) existing.src=poster;
+    else cover.insertAdjacentHTML('afterbegin', `<img src="${escapeHtml(poster)}" alt="Cover for ${escapeHtml(title)}" loading="lazy" onerror="this.remove()">`);
   }
   const btn=card.querySelector('[data-searchposter]');
   if(btn) btn.remove();
 }
 function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
 
+/* ---------- Poster picker (manual cover selection) ---------- */
 async function quickPosterLookup(id){
   const m=state.movies.find(x=>x.id===id); if(!m) return;
-  const poster=await findPoster(m.title,{section:m.section,format:m.format});
-  if(poster){m.poster=poster; m.updated=today(); save(); render(); toast('Poster added.');}
-  else toast('No poster found automatically.');
+  openPosterPicker({
+    title: m.title,
+    section: m.section,
+    format: m.format,
+    onSelect: poster => {
+      m.poster=poster; m.updated=today(); save();
+      updateCardPoster(id, poster, m.title);
+      toast('Cover added.');
+    }
+  });
 }
-async function lookupPosterForForm(prefix){
+function lookupPosterForForm(prefix){
   const isNew=prefix==='new';
   const title=(isNew?els.newTitle:els.editMovieTitle).value.trim();
-  if(!title){toast('Type a title first.'); return;}
+  if(!title){toast('Type a title first.'); (isNew?els.newTitle:els.editMovieTitle).focus(); return;}
   const section=isNew ? (els.customSection.value.trim() || els.newSection.value) : (els.editCustomSection.value.trim() || els.editSection.value);
   const format=isNew ? els.newFormat.value : els.editFormat.value;
-  const poster=await findPoster(title,{section,format});
-  if(poster){(isNew?els.newPoster:els.editPoster).value=poster; updateEditPreview(); toast('Poster found.');}
-  else toast('No poster found automatically.');
+  openPosterPicker({
+    title, section, format,
+    onSelect: poster => {
+      (isNew?els.newPoster:els.editPoster).value=poster;
+      if(!isNew) updateEditPreview();
+      toast('Cover selected.');
+    }
+  });
 }
-const _posterFailCache=new Set();
-function _posterKey(title, options){
-  return normalizeSearchText(cleanMovieTitle(title))+'|'+String(options?.section||'').toUpperCase();
+function openPosterPicker(opts){
+  posterPickerState = {
+    title: opts.title,
+    section: opts.section || '',
+    format: opts.format || '',
+    onSelect: opts.onSelect,
+    generation: 0
+  };
+  els.pickerTitle.textContent = `Pick a cover for "${opts.title}"`;
+  els.pickerSearchInput.value = cleanMovieTitle(opts.title);
+  els.pickerUrlInput.value = '';
+  els.pickerGrid.innerHTML = '';
+  els.posterPickerModal.classList.add('active');
+  refreshPickerCandidates(els.pickerSearchInput.value);
 }
-async function findPoster(title, options={}){
-  const key=_posterKey(title, options);
-  if(_posterFailCache.has(key)) return '';
+function closePosterPicker(){
+  if(posterPickerState) posterPickerState.generation++;
+  posterPickerState = null;
+  els.posterPickerModal.classList.remove('active');
+}
+function commitPickerSelection(url, source){
+  url = String(url||'').trim();
+  if(!url){toast('Paste a URL first.'); return;}
+  if(!/^https?:\/\//i.test(url)){toast('URL must start with http:// or https://'); return;}
+  const cb = posterPickerState?.onSelect;
+  closePosterPicker();
+  if(cb) cb(url);
+}
+async function refreshPickerCandidates(searchTerm){
+  if(!posterPickerState) return;
+  const gen = ++posterPickerState.generation;
+  const state0 = posterPickerState;
+  els.pickerStatus.textContent = 'Searching candidates…';
+  els.pickerGrid.innerHTML = '';
   try{
-    if(!options.silent) toast('Searching poster…');
-    const queries=buildPosterQueries(title, options);
-    let best=null;
-    // iTunes — US first, GB as fallback. Strict (movieTerm) attribute filter.
-    outer: for(const country of ['US','GB']){
-      for(const q of queries){
-        try{
-          const url='https://itunes.apple.com/search?media=movie&entity=movie&attribute=movieTerm&limit=15&country='+country+'&term='+encodeURIComponent(q);
-          const res=await fetch(url);
-          if(res.ok){
-            const data=await res.json();
-            for(const r of (data.results||[])){
-              if(!r.artworkUrl100) continue;
-              const score=scorePosterResult(r, title, q, options);
-              if(!best || score>best.score) best={score, result:r};
-            }
-          }
-        }catch(_){}
-        if(best && best.score>=85) break outer;
-      }
-      if(best && best.score>=70) break;
-    }
-    // One broad (no-attribute) iTunes attempt if strict found nothing usable.
-    if(!best || best.score<35){
-      try{
-        const q=queries[0]||cleanMovieTitle(title);
-        const url='https://itunes.apple.com/search?media=movie&entity=movie&limit=15&country=US&term='+encodeURIComponent(q);
-        const res=await fetch(url);
-        if(res.ok){
-          const data=await res.json();
-          for(const r of (data.results||[])){
-            if(!r.artworkUrl100) continue;
-            const score=scorePosterResult(r, title, q, options);
-            if(!best || score>best.score) best={score, result:r};
-          }
-        }
-      }catch(_){}
-    }
-    if(best && best.score>=35) return upgradeArtworkUrl(best.result.artworkUrl100);
-    const wiki=await findWikipediaPoster(title, options);
-    if(wiki) return wiki;
-    _posterFailCache.add(key);
-    return '';
+    const candidates = await gatherPosterCandidates(searchTerm || state0.title, {section:state0.section, format:state0.format, originalTitle: state0.title});
+    if(!posterPickerState || posterPickerState.generation !== gen) return; // picker was closed or re-searched
+    renderPickerCandidates(candidates);
   }catch(e){
-    try{
-      const wiki=await findWikipediaPoster(title, options);
-      if(wiki) return wiki;
-    }catch(_){}
-    _posterFailCache.add(key);
-    return '';
+    if(!posterPickerState || posterPickerState.generation !== gen) return;
+    els.pickerStatus.textContent = 'Search failed. Try a different term, or paste a URL below.';
+    els.pickerGrid.innerHTML = '';
   }
+}
+function renderPickerCandidates(candidates){
+  if(!candidates.length){
+    els.pickerStatus.textContent = 'No candidates found.';
+    els.pickerGrid.innerHTML = '<div class="pickerEmpty">Nothing matched. Try a different search term, or paste a URL below.</div>';
+    return;
+  }
+  els.pickerStatus.textContent = `${candidates.length} candidate${candidates.length===1?'':'s'} — tap one to use it.`;
+  els.pickerGrid.innerHTML = candidates.map((c,i)=>`
+    <button class="pickerThumb" data-pickerpick="${i}" title="${escapeHtml(c.label||'')}">
+      <img src="${escapeHtml(c.url)}" alt="${escapeHtml(c.label||'Candidate')}" loading="lazy" onerror="this.closest('.pickerThumb').style.display='none'">
+      <span class="src">${escapeHtml(c.source)}${c.year?(' · '+c.year):''}</span>
+      ${c.label?`<span class="nm">${escapeHtml(c.label)}</span>`:''}
+    </button>`).join('');
+  els.pickerGrid.querySelectorAll('[data-pickerpick]').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const idx = parseInt(btn.dataset.pickerpick,10);
+      const c = candidates[idx];
+      if(c) commitPickerSelection(c.url, c.source);
+    });
+  });
+}
+async function gatherPosterCandidates(searchTerm, options={}){
+  const originalTitle = options.originalTitle || searchTerm;
+  const all = [];
+  const seen = new Set();
+  const pushCand = (c) => {
+    if(!c || !c.url) return;
+    const key = c.url.replace(/^https?:/,'').replace(/\d+x\d+(bb)?/g,'X');
+    if(seen.has(key)) return;
+    seen.add(key);
+    all.push(c);
+  };
+  // Build the iTunes query list — primary is the user's (edited) search term, then variants from buildPosterQueries
+  const baseQueries = [searchTerm.trim(), ...buildPosterQueries(searchTerm, options)];
+  const itunesQueries = [...new Set(baseQueries.map(q=>q.trim()).filter(Boolean))].slice(0,3);
+
+  // --- iTunes: strict (movieTerm) US, then broad US, then strict GB ---
+  const itunesAttempts = [];
+  for(const q of itunesQueries){
+    itunesAttempts.push({country:'US', strict:true, q});
+  }
+  itunesAttempts.push({country:'US', strict:false, q: itunesQueries[0]});
+  itunesAttempts.push({country:'GB', strict:true, q: itunesQueries[0]});
+
+  const itunesPromises = itunesAttempts.map(async a => {
+    try{
+      const attr = a.strict ? '&attribute=movieTerm' : '';
+      const url = `https://itunes.apple.com/search?media=movie&entity=movie${attr}&limit=10&country=${a.country}&term=${encodeURIComponent(a.q)}`;
+      const res = await fetch(url);
+      if(!res.ok) return [];
+      const data = await res.json();
+      return (data.results||[]).map(r => ({
+        url: r.artworkUrl100 ? upgradeArtworkUrl(r.artworkUrl100) : '',
+        source: 'iTunes',
+        label: r.trackName || r.collectionName || '',
+        year: (r.releaseDate||'').slice(0,4) || '',
+        score: scorePosterResult(r, originalTitle, a.q, options),
+        kind: r.kind || ''
+      }));
+    }catch(_){ return []; }
+  });
+
+  // --- Wikipedia: top page-image hits ---
+  const wikiQueries = [searchTerm.trim(), ...buildWikipediaPosterQueries(searchTerm, options)];
+  const wikiUnique = [...new Set(wikiQueries.map(q=>q.trim()).filter(Boolean))].slice(0,2);
+  const wikiPromises = wikiUnique.map(async q => {
+    try{
+      const url = 'https://en.wikipedia.org/w/api.php?action=query&generator=search&gsrnamespace=0&gsrlimit=6&gsrsearch='+encodeURIComponent(q)+'&prop=pageimages|description&piprop=thumbnail&pithumbsize=800&format=json&origin=*';
+      const res = await fetch(url);
+      if(!res.ok) return [];
+      const data = await res.json();
+      const pages = Object.values(data.query?.pages || {});
+      return pages.filter(p=>p.thumbnail?.source).map(p => ({
+        url: p.thumbnail.source,
+        source: 'Wikipedia',
+        label: p.title || '',
+        year: '',
+        score: scoreWikiPosterPage(p, originalTitle, q, options),
+        kind: p.description || ''
+      }));
+    }catch(_){ return []; }
+  });
+
+  const results = await Promise.all([...itunesPromises, ...wikiPromises]);
+  for(const arr of results){
+    for(const c of arr){
+      if(c.url) pushCand(c);
+    }
+  }
+  // Sort: highest score first, but keep all results so user can override
+  all.sort((a,b)=>b.score-a.score);
+  return all.slice(0,30);
 }
 function cleanMovieTitle(t){
   let s=String(t||'').trim();
