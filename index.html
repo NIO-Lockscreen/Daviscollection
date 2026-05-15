@@ -345,7 +345,7 @@
     <section class="stats" aria-label="Collection stats">
       <div class="stat" id="totalStat"><small id="totalLabel">Total titles</small><strong id="totalCount">0</strong></div>
       <div class="stat clickable" id="duplicatesStat" role="button" tabindex="0" aria-pressed="false" title="Click to show only titles you own multiple copies of"><small>Duplicates</small><strong id="duplicateCount">0</strong><span class="micro" id="duplicateMicro">Click to filter</span></div>
-      <div class="stat"><small>4K / UHD</small><strong id="fourKCount">0</strong></div>
+      <div class="stat clickable" id="smartFilterStat" role="button" tabindex="0" aria-pressed="false" title="Click to filter unsorted titles, or unseen titles when there are no unsorted titles"><small id="smartFilterLabel">Unsorted</small><strong id="fourKCount">0</strong><span class="micro" id="smartFilterMicro">Click to filter</span></div>
       <div class="stat clickable" id="collectionValueStat" title="Double click to edit collection value"><small>Total collection value</small><strong id="collectionValue">0 kr</strong><span class="micro">Double-click to edit</span></div>
     </section>
 
@@ -433,6 +433,7 @@
     </div>
     <div class="actions">
       <button class="danger" id="deleteMovieBtn">Delete</button>
+      <button class="ghost" id="removePosterBtn">Remove poster</button>
       <button class="ghost" id="editPosterLookupBtn">Find poster</button>
       <button class="primary" id="saveEditBtn">Save changes</button>
     </div>
@@ -516,11 +517,13 @@ const AUTO_COVER_CONCURRENCY = 2;
 
 function $(id){return document.getElementById(id)}
 function init(){
-  ['totalCount','totalLabel','totalStat','duplicatesStat','duplicateCount','duplicateMicro','fourKCount','collectionValue','collectionValueStat','searchInput','sectionFilter','formatFilter','seenFilter','sortSelect','unsortedBtn','viewToggle','movieGrid','resultText','newTitle','newSection','customSection','newFormat','newBarcode','newSeen','newPoster','newNotes','addMovieBtn','posterLookupBtn','barcodeLookupBtn','scanner','scanVideo','scannerText','startScanBtn','stopScanBtn','scanStatus','backupMenuBtn','backupMenu','exportJsonBtn','importBtn','importFile','blueprintPreview','downloadBlueprintBtn','downloadBlueprintTextBtn','printBlueprintBtn','editModal','editPreview','closeModalBtn','editMovieTitle','editSection','editCustomSection','editFormat','editBarcode','editSeen','editPoster','editNotes','deleteMovieBtn','editPosterLookupBtn','saveEditBtn','valueModal','valueCloseBtn','valueCurrentText','valueMode','valueAmount','valueNote','valuePreviewText','valueWarning','valueConfirmLine','valueConfirm','rollbackValueBtn','applyValueBtn','valueHistoryList','toast','posterPickerModal','pickerTitle','pickerSubtitle','pickerSearchInput','pickerSearchBtn','pickerStatus','pickerGrid','pickerUrlInput','pickerUrlBtn','pickerCloseBtn'].forEach(id=>els[id]=$(id));
+  ['totalCount','totalLabel','totalStat','duplicatesStat','duplicateCount','duplicateMicro','smartFilterStat','smartFilterLabel','smartFilterMicro','fourKCount','collectionValue','collectionValueStat','searchInput','sectionFilter','formatFilter','seenFilter','sortSelect','unsortedBtn','viewToggle','movieGrid','resultText','newTitle','newSection','customSection','newFormat','newBarcode','newSeen','newPoster','newNotes','addMovieBtn','posterLookupBtn','barcodeLookupBtn','scanner','scanVideo','scannerText','startScanBtn','stopScanBtn','scanStatus','backupMenuBtn','backupMenu','exportJsonBtn','importBtn','importFile','blueprintPreview','downloadBlueprintBtn','downloadBlueprintTextBtn','printBlueprintBtn','editModal','editPreview','closeModalBtn','editMovieTitle','editSection','editCustomSection','editFormat','editBarcode','editSeen','editPoster','editNotes','deleteMovieBtn','removePosterBtn','editPosterLookupBtn','saveEditBtn','valueModal','valueCloseBtn','valueCurrentText','valueMode','valueAmount','valueNote','valuePreviewText','valueWarning','valueConfirmLine','valueConfirm','rollbackValueBtn','applyValueBtn','valueHistoryList','toast','posterPickerModal','pickerTitle','pickerSubtitle','pickerSearchInput','pickerSearchBtn','pickerStatus','pickerGrid','pickerUrlInput','pickerUrlBtn','pickerCloseBtn'].forEach(id=>els[id]=$(id));
   document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>showScreen(btn.dataset.screen)));
   ['searchInput','sectionFilter','formatFilter','seenFilter','sortSelect'].forEach(id=>els[id].addEventListener('input', render));
   els.duplicatesStat.addEventListener('click', toggleDuplicatesOnly);
   els.duplicatesStat.addEventListener('keydown', e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault(); toggleDuplicatesOnly();}});
+  els.smartFilterStat.addEventListener('click', applySmartCountFilter);
+  els.smartFilterStat.addEventListener('keydown', e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault(); applySmartCountFilter();}});
   els.viewToggle.textContent=compact?'Cover view':'List view';
   els.viewToggle.addEventListener('click',()=>{compact=!compact; localStorage.setItem('movieVault.viewMode', compact?'list':'cover'); els.viewToggle.textContent=compact?'Cover view':'List view'; render();});
   els.unsortedBtn.addEventListener('click',()=>{els.sectionFilter.value=UNSORTED_SECTION; render(); showScreen('library');});
@@ -552,6 +555,7 @@ function init(){
   els.closeModalBtn.addEventListener('click',closeModal);
   els.saveEditBtn.addEventListener('click',saveEdit);
   els.deleteMovieBtn.addEventListener('click',deleteEditingMovie);
+  els.removePosterBtn.addEventListener('click',()=>{if(editingId) removePoster(editingId,{keepModal:true});});
   els.editPosterLookupBtn.addEventListener('click',()=>lookupPosterForForm('edit'));
   ['editMovieTitle','editPoster','editSection','editFormat','editBarcode','editSeen'].forEach(id=>els[id].addEventListener('input',()=>updateEditPreview()));
   window.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal(); closePosterPicker(); closeValueModal();}});
@@ -583,6 +587,7 @@ function normalizeState(input){
       format:normalizeFormat(m.format, section, fixed.title || '', m.id),
       barcode:m.barcode || '',
       poster:m.poster || '',
+      posterRemoved:m.posterRemoved === true,
       notes,
       catalog:fixed.catalog,
       seen: m.seen === false ? false : true,
@@ -707,6 +712,7 @@ function render(){
   }));
   els.movieGrid.querySelectorAll('[data-edit]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation(); openEdit(btn.dataset.edit)}));
   els.movieGrid.querySelectorAll('[data-searchposter]').forEach(btn=>btn.addEventListener('click',async e=>{e.stopPropagation(); await quickPosterLookup(btn.dataset.searchposter)}));
+  els.movieGrid.querySelectorAll('[data-remove-poster]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation(); removePoster(btn.dataset.removePoster)}));
   els.movieGrid.querySelectorAll('[data-toggle-seen]').forEach(btn=>btn.addEventListener('click',e=>{e.stopPropagation(); toggleSeen(btn.dataset.toggleSeen)}));
   setupVisibleCoverAutoload();
 }
@@ -721,6 +727,21 @@ function isFilterActive(){
 function toggleDuplicatesOnly(){
   duplicatesOnly = !duplicatesOnly;
   render();
+}
+function applySmartCountFilter(){
+  const unsortedCount = state.movies.filter(m=>m.section===UNSORTED_SECTION).length;
+  const mode = unsortedCount > 0 ? 'unsorted' : 'unseen';
+  if(mode==='unsorted'){
+    const alreadyActive = els.sectionFilter.value===UNSORTED_SECTION;
+    els.sectionFilter.value = alreadyActive ? 'all' : UNSORTED_SECTION;
+    if(!alreadyActive) els.seenFilter.value = 'all';
+  }else{
+    const alreadyActive = els.seenFilter.value==='unseen' && els.sectionFilter.value==='all';
+    els.seenFilter.value = alreadyActive ? 'all' : 'unseen';
+    els.sectionFilter.value = 'all';
+  }
+  render();
+  showScreen('library');
 }
 
 function populateStats(filteredList){
@@ -742,7 +763,20 @@ function populateStats(filteredList){
   els.duplicatesStat.classList.toggle('toggled', duplicatesOnly);
   els.duplicatesStat.setAttribute('aria-pressed', duplicatesOnly ? 'true' : 'false');
   els.duplicateMicro.textContent = duplicatesOnly ? 'Showing duplicates · click to clear' : 'Click to filter';
-  els.fourKCount.textContent=state.movies.filter(m=>m.format==='4K UHD'||m.format==='4K Steelbook'||m.section.includes('4K')||m.title.toUpperCase().includes('4K')).length.toLocaleString();
+
+  const unsortedCount = state.movies.filter(m=>m.section===UNSORTED_SECTION).length;
+  const unseenCount = state.movies.filter(m=>m.seen===false).length;
+  const smartMode = unsortedCount > 0 ? 'unsorted' : 'unseen';
+  const smartCount = smartMode==='unsorted' ? unsortedCount : unseenCount;
+  const smartActive = smartMode==='unsorted'
+    ? els.sectionFilter.value===UNSORTED_SECTION
+    : els.seenFilter.value==='unseen' && els.sectionFilter.value==='all';
+  els.smartFilterLabel.textContent = smartMode==='unsorted' ? 'Unsorted' : 'Unseen';
+  els.fourKCount.textContent = smartCount.toLocaleString();
+  els.smartFilterMicro.textContent = smartActive ? `Showing ${smartMode} · click to clear` : `Click to filter ${smartMode}`;
+  els.smartFilterStat.classList.toggle('toggled', smartActive);
+  els.smartFilterStat.setAttribute('aria-pressed', smartActive ? 'true' : 'false');
+  els.smartFilterStat.title = smartMode==='unsorted' ? 'Click to show unsorted titles' : 'Click to show unseen titles';
   els.collectionValue.textContent=formatMoney(state.collectionValue || 0);
 }
 function cardHtml(m, dupeCount){
@@ -750,17 +784,21 @@ function cardHtml(m, dupeCount){
   const dupe = dupeCount>1 ? `<span class="chip">${dupeCount} editions</span>` : '';
   const barcode = m.barcode ? `<span class="chip">${escapeHtml(m.barcode)}</span>` : '';
   const seenChip = m.seen===false ? '<span class="chip unseenPill">Not seen</span>' : '<span class="chip seenPill">Seen</span>';
+  const removedChip = (!m.poster && m.posterRemoved===true) ? '<span class="chip posterRemovedPill">Poster removed</span>' : '';
   const seenBtn = m.seen===false ? 'Mark seen' : 'Mark unseen';
+  const needsPoster = !m.poster && m.posterRemoved!==true;
   if(compact){
-    return `<article class="card" data-id="${escapeHtml(m.id)}" data-needs-poster="${m.poster?'false':'true'}" style="--hue:${hue}">
-      <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${seenChip}${dupe}${barcode}</div><div class="formatBadge">${escapeHtml(m.format)}</div></div>
+    return `<article class="card" data-id="${escapeHtml(m.id)}" data-needs-poster="${needsPoster?'true':'false'}" style="--hue:${hue}">
+      <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${seenChip}${removedChip}${dupe}${barcode}</div><div class="formatBadge">${escapeHtml(m.format)}</div></div>
     </article>`;
   }
   const img = m.poster ? `<img src="${escapeHtml(m.poster)}" alt="Cover for ${escapeHtml(m.title)}" loading="lazy" onerror="this.remove()">` : '';
-  const posterBtn = m.poster ? '' : `<button class="miniBtn" data-searchposter="${escapeHtml(m.id)}">Find poster</button>`;
-  return `<article class="card" data-id="${escapeHtml(m.id)}" data-needs-poster="${m.poster?'false':'true'}" style="--hue:${hue}">
+  const posterBtn = m.poster
+    ? `<button class="miniBtn" data-remove-poster="${escapeHtml(m.id)}">Remove poster</button>`
+    : `<button class="miniBtn" data-searchposter="${escapeHtml(m.id)}">${m.posterRemoved===true?'Choose poster':'Find poster'}</button>`;
+  return `<article class="card" data-id="${escapeHtml(m.id)}" data-needs-poster="${needsPoster?'true':'false'}" style="--hue:${hue}">
     <div class="cover">${img}<div class="coverTitle">${escapeHtml(shortCoverTitle(m.title))}</div><div class="formatBadge">${escapeHtml(m.format)}</div></div>
-    <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${seenChip}${dupe}${barcode}</div>${m.notes?`<div class="notes">${escapeHtml(m.notes)}</div>`:''}<div class="cardActions"><button class="miniBtn" data-toggle-seen="${escapeHtml(m.id)}">${seenBtn}</button><button class="miniBtn" data-edit="${escapeHtml(m.id)}">Edit</button>${posterBtn}</div></div>
+    <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${seenChip}${removedChip}${dupe}${barcode}</div>${m.notes?`<div class="notes">${escapeHtml(m.notes)}</div>`:''}<div class="cardActions"><button class="miniBtn" data-toggle-seen="${escapeHtml(m.id)}">${seenBtn}</button><button class="miniBtn" data-edit="${escapeHtml(m.id)}">Edit</button>${posterBtn}</div></div>
   </article>`;
 }
 function shortCoverTitle(t){return t.length>52 ? t.slice(0,49)+'…' : t}
@@ -775,7 +813,7 @@ function getSectionFromForm(prefix){
 function addMovie(){
   const title=els.newTitle.value.trim();
   if(!title){toast('Add a title first.'); els.newTitle.focus(); return;}
-  const movie={id:cryptoId(), title, section:getSectionFromForm('new'), format:els.newFormat.value, barcode:els.newBarcode.value.trim(), poster:els.newPoster.value.trim(), notes:els.newNotes.value.trim(), seen:!!els.newSeen.checked, added:today(), updated:today()};
+  const movie={id:cryptoId(), title, section:getSectionFromForm('new'), format:els.newFormat.value, barcode:els.newBarcode.value.trim(), poster:els.newPoster.value.trim(), posterRemoved:false, notes:els.newNotes.value.trim(), seen:!!els.newSeen.checked, added:today(), updated:today()};
   state.movies.unshift(movie);
   save();
   ['newTitle','customSection','newBarcode','newPoster','newNotes'].forEach(id=>els[id].value=''); els.newSeen.checked=false; els.newSection.value=UNSORTED_SECTION;
@@ -796,14 +834,19 @@ function updateEditPreview(){
   const format=(els.editFormat?.value || '').trim();
   const barcode=(els.editBarcode?.value || '').trim();
   const seen=els.editSeen?.checked ? 'Seen' : 'Not seen yet';
+  const currentMovie = editingId ? state.movies.find(x=>x.id===editingId) : null;
+  const posterRemoved = !poster && currentMovie?.posterRemoved === true;
   const cover=poster ? `<div class="modalCover"><img src="${escapeHtml(poster)}" alt="Cover for ${escapeHtml(title)}" onerror="this.parentElement.textContent='No cover';"></div>` : `<div class="modalCover">${escapeHtml(shortCoverTitle(title))}</div>`;
-  els.editPreview.innerHTML = `${cover}<div class="modalPreviewInfo"><strong style="color:var(--text)">${escapeHtml(title)}</strong><br>${escapeHtml(section || 'No section')} · ${escapeHtml(format || 'No format')} · ${escapeHtml(seen)}${barcode?`<br>Barcode: ${escapeHtml(barcode)}`:''}<br><span>Click “Find poster” to search again, or paste a cover URL manually.</span></div>`;
+  const posterHint = posterRemoved ? 'Poster removed. Auto cover loading is disabled until you choose a new poster.' : 'Click “Find poster” to search again, or paste a cover URL manually.';
+  els.editPreview.innerHTML = `${cover}<div class="modalPreviewInfo"><strong style="color:var(--text)">${escapeHtml(title)}</strong><br>${escapeHtml(section || 'No section')} · ${escapeHtml(format || 'No format')} · ${escapeHtml(seen)}${barcode?`<br>Barcode: ${escapeHtml(barcode)}`:''}<br><span>${escapeHtml(posterHint)}</span></div>`;
 }
 function closeModal(){els.editModal.classList.remove('active'); editingId=null;}
 function saveEdit(){
   const m=state.movies.find(x=>x.id===editingId); if(!m) return;
   const title=els.editMovieTitle.value.trim(); if(!title){toast('Movie needs a title.'); return;}
-  m.title=title; m.section=getSectionFromForm('edit'); m.format=els.editFormat.value; m.barcode=els.editBarcode.value.trim(); m.seen=!!els.editSeen.checked; m.poster=els.editPoster.value.trim(); m.notes=els.editNotes.value.trim(); m.updated=today();
+  const oldPoster = m.poster || '';
+  const nextPoster = els.editPoster.value.trim();
+  m.title=title; m.section=getSectionFromForm('edit'); m.format=els.editFormat.value; m.barcode=els.editBarcode.value.trim(); m.seen=!!els.editSeen.checked; m.poster=nextPoster; m.posterRemoved=nextPoster ? false : !!(oldPoster || m.posterRemoved); m.notes=els.editNotes.value.trim(); m.updated=today();
   save(); populateSelects(); render(); closeModal(); toast('Saved changes.');
 }
 function deleteEditingMovie(){
@@ -926,8 +969,34 @@ function updateCardPoster(id,poster,title){
     if(existing) existing.src=poster;
     else cover.insertAdjacentHTML('afterbegin', `<img src="${escapeHtml(poster)}" alt="Cover for ${escapeHtml(title)}" loading="lazy" onerror="this.remove()">`);
   }
-  const btn=card.querySelector('[data-searchposter]');
-  if(btn) btn.remove();
+  const findBtn=card.querySelector('[data-searchposter]');
+  if(findBtn) findBtn.remove();
+  card.querySelectorAll('.posterRemovedPill').forEach(chip=>chip.remove());
+  const actions=card.querySelector('.cardActions');
+  if(actions && !actions.querySelector('[data-remove-poster]')){
+    const removeBtn=document.createElement('button');
+    removeBtn.className='miniBtn';
+    removeBtn.dataset.removePoster=id;
+    removeBtn.textContent='Remove poster';
+    removeBtn.addEventListener('click',e=>{e.stopPropagation(); removePoster(id);});
+    actions.appendChild(removeBtn);
+  }
+}
+function removePoster(id, opts={}){
+  const m=state.movies.find(x=>x.id===id); if(!m) return;
+  if(!m.poster && m.posterRemoved===true){toast('Poster is already removed for this title.'); return;}
+  m.poster='';
+  m.posterRemoved=true;
+  m.updated=today();
+  autoCoverQueued.delete(id);
+  autoCoverFailedSession.add(id);
+  save();
+  if(opts.keepModal){
+    els.editPoster.value='';
+    updateEditPreview();
+  }
+  render();
+  toast('Poster removed. Auto cover loading is disabled for this title.');
 }
 function sleep(ms){return new Promise(resolve=>setTimeout(resolve,ms));}
 
@@ -939,7 +1008,7 @@ async function quickPosterLookup(id){
     section: m.section,
     format: m.format,
     onSelect: poster => {
-      m.poster=poster; m.updated=today(); save();
+      m.poster=poster; m.posterRemoved=false; m.updated=today(); save();
       updateCardPoster(id, poster, m.title);
       toast('Cover added.');
     }
@@ -1257,7 +1326,7 @@ function setupVisibleCoverAutoload(){
 function queueAutoCover(id){
   if(!id || autoCoverQueued.has(id) || autoCoverRunning.has(id) || autoCoverFailedSession.has(id)) return;
   const movie=state.movies.find(m=>m.id===id);
-  if(!movie || movie.poster) return;
+  if(!movie || movie.poster || movie.posterRemoved===true) return;
   autoCoverQueued.add(id);
   autoCoverQueue.push(id);
   pumpAutoCoverQueue();
@@ -1275,14 +1344,14 @@ function pumpAutoCoverQueue(){
 }
 async function autoLoadVisibleCover(id){
   const movie=state.movies.find(m=>m.id===id);
-  if(!movie || movie.poster) return;
+  if(!movie || movie.poster || movie.posterRemoved===true) return;
   const card=[...els.movieGrid.querySelectorAll('.card')].find(c=>c.dataset.id===id);
   if(!card) return;
   const cacheKey=smartCoverCacheKey(movie.title, {section:movie.section, format:movie.format});
   const cached=getSmartCoverCache(cacheKey);
   if(cached){
     if(cached.posterUrl){
-      if(!movie.poster){movie.poster=cached.posterUrl; movie.updated=today(); save(); updateCardPoster(id, cached.posterUrl, movie.title);}
+      if(!movie.poster && movie.posterRemoved!==true){movie.poster=cached.posterUrl; movie.posterRemoved=false; movie.updated=today(); save(); updateCardPoster(id, cached.posterUrl, movie.title);}
     }else{
       autoCoverFailedSession.add(id);
     }
@@ -1294,8 +1363,9 @@ async function autoLoadVisibleCover(id){
     if(result?.posterUrl){
       setSmartCoverCache(cacheKey, result, COVER_SUCCESS_CACHE_DAYS);
       const stillMovie=state.movies.find(m=>m.id===id);
-      if(stillMovie && !stillMovie.poster){
+      if(stillMovie && !stillMovie.poster && stillMovie.posterRemoved!==true){
         stillMovie.poster=result.posterUrl;
+        stillMovie.posterRemoved=false;
         stillMovie.updated=today();
         save();
         updateCardPoster(id, result.posterUrl, stillMovie.title);
