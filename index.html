@@ -113,11 +113,13 @@
   .stat strong{font-size:2rem;letter-spacing:-.04em}
   .stat.clickable{cursor:pointer;user-select:none}
   .stat.clickable:hover{border-color:rgba(125,211,252,.5);background:linear-gradient(180deg, rgba(125,211,252,.13), rgba(255,255,255,.055))}
-  .stat.active{border-color:rgba(134,239,172,.58);background:linear-gradient(180deg, rgba(134,239,172,.15), rgba(255,255,255,.055))}
+  .stat.toggled{border-color:rgba(125,211,252,.65);background:linear-gradient(180deg, rgba(125,211,252,.24), rgba(192,132,252,.14));box-shadow:0 18px 50px rgba(125,211,252,.18), var(--shadow)}
+  .stat.toggled small{color:var(--accent)}
+  .stat.filtered strong{color:var(--accent)}
   .stat .micro{display:block;margin-top:6px;color:var(--muted);font-size:.75rem;letter-spacing:0;text-transform:none;font-weight:600}
   .controls{
     display:grid;
-    grid-template-columns:minmax(220px,2fr) minmax(160px,1fr) minmax(145px,1fr) minmax(140px,1fr) minmax(140px,1fr) minmax(150px,1fr) auto auto;
+    grid-template-columns:minmax(220px,2fr) minmax(160px,1fr) minmax(145px,1fr) minmax(140px,1fr) minmax(150px,1fr) auto auto;
     gap:12px;
     padding:14px;
     border:1px solid var(--line);
@@ -341,8 +343,8 @@
 
   <main id="library" class="screen active">
     <section class="stats" aria-label="Collection stats">
-      <div class="stat"><small id="totalCountLabel">Total titles</small><strong id="totalCount">0</strong></div>
-      <div class="stat clickable" id="duplicateStat" title="Click to toggle duplicates only"><small id="duplicateLabel">Duplicates</small><strong id="duplicateCount">0</strong><span class="micro" id="duplicateHint">Click to show duplicates only</span></div>
+      <div class="stat" id="totalStat"><small id="totalLabel">Total titles</small><strong id="totalCount">0</strong></div>
+      <div class="stat clickable" id="duplicatesStat" role="button" tabindex="0" aria-pressed="false" title="Click to show only titles you own multiple copies of"><small>Duplicates</small><strong id="duplicateCount">0</strong><span class="micro" id="duplicateMicro">Click to filter</span></div>
       <div class="stat"><small>4K / UHD</small><strong id="fourKCount">0</strong></div>
       <div class="stat clickable" id="collectionValueStat" title="Double click to edit collection value"><small>Total collection value</small><strong id="collectionValue">0 kr</strong><span class="micro">Double-click to edit</span></div>
     </section>
@@ -494,7 +496,7 @@ const els = {};
 let state = loadState();
 let activeScreen = 'library';
 let compact = localStorage.getItem('movieVault.viewMode') === 'list';
-let duplicatesOnly = localStorage.getItem('movieVault.duplicatesOnly') === 'true';
+let duplicatesOnly = false;
 let editingId = null;
 let posterPickerState = null;
 let scanStream = null;
@@ -514,12 +516,13 @@ const AUTO_COVER_CONCURRENCY = 2;
 
 function $(id){return document.getElementById(id)}
 function init(){
-  ['totalCountLabel','totalCount','duplicateStat','duplicateLabel','duplicateCount','duplicateHint','fourKCount','collectionValue','collectionValueStat','searchInput','sectionFilter','formatFilter','seenFilter','sortSelect','unsortedBtn','viewToggle','movieGrid','resultText','newTitle','newSection','customSection','newFormat','newBarcode','newSeen','newPoster','newNotes','addMovieBtn','posterLookupBtn','barcodeLookupBtn','scanner','scanVideo','scannerText','startScanBtn','stopScanBtn','scanStatus','backupMenuBtn','backupMenu','exportJsonBtn','importBtn','importFile','blueprintPreview','downloadBlueprintBtn','downloadBlueprintTextBtn','printBlueprintBtn','editModal','editPreview','closeModalBtn','editMovieTitle','editSection','editCustomSection','editFormat','editBarcode','editSeen','editPoster','editNotes','deleteMovieBtn','editPosterLookupBtn','saveEditBtn','valueModal','valueCloseBtn','valueCurrentText','valueMode','valueAmount','valueNote','valuePreviewText','valueWarning','valueConfirmLine','valueConfirm','rollbackValueBtn','applyValueBtn','valueHistoryList','toast','posterPickerModal','pickerTitle','pickerSubtitle','pickerSearchInput','pickerSearchBtn','pickerStatus','pickerGrid','pickerUrlInput','pickerUrlBtn','pickerCloseBtn'].forEach(id=>els[id]=$(id));
+  ['totalCount','totalLabel','totalStat','duplicatesStat','duplicateCount','duplicateMicro','fourKCount','collectionValue','collectionValueStat','searchInput','sectionFilter','formatFilter','seenFilter','sortSelect','unsortedBtn','viewToggle','movieGrid','resultText','newTitle','newSection','customSection','newFormat','newBarcode','newSeen','newPoster','newNotes','addMovieBtn','posterLookupBtn','barcodeLookupBtn','scanner','scanVideo','scannerText','startScanBtn','stopScanBtn','scanStatus','backupMenuBtn','backupMenu','exportJsonBtn','importBtn','importFile','blueprintPreview','downloadBlueprintBtn','downloadBlueprintTextBtn','printBlueprintBtn','editModal','editPreview','closeModalBtn','editMovieTitle','editSection','editCustomSection','editFormat','editBarcode','editSeen','editPoster','editNotes','deleteMovieBtn','editPosterLookupBtn','saveEditBtn','valueModal','valueCloseBtn','valueCurrentText','valueMode','valueAmount','valueNote','valuePreviewText','valueWarning','valueConfirmLine','valueConfirm','rollbackValueBtn','applyValueBtn','valueHistoryList','toast','posterPickerModal','pickerTitle','pickerSubtitle','pickerSearchInput','pickerSearchBtn','pickerStatus','pickerGrid','pickerUrlInput','pickerUrlBtn','pickerCloseBtn'].forEach(id=>els[id]=$(id));
   document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>showScreen(btn.dataset.screen)));
   ['searchInput','sectionFilter','formatFilter','seenFilter','sortSelect'].forEach(id=>els[id].addEventListener('input', render));
+  els.duplicatesStat.addEventListener('click', toggleDuplicatesOnly);
+  els.duplicatesStat.addEventListener('keydown', e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault(); toggleDuplicatesOnly();}});
   els.viewToggle.textContent=compact?'Cover view':'List view';
   els.viewToggle.addEventListener('click',()=>{compact=!compact; localStorage.setItem('movieVault.viewMode', compact?'list':'cover'); els.viewToggle.textContent=compact?'Cover view':'List view'; render();});
-  els.duplicateStat.addEventListener('click',()=>{duplicatesOnly=!duplicatesOnly; localStorage.setItem('movieVault.duplicatesOnly', duplicatesOnly?'true':'false'); render(); toast(duplicatesOnly?'Showing duplicates only':'Normal view');});
   els.unsortedBtn.addEventListener('click',()=>{els.sectionFilter.value=UNSORTED_SECTION; render(); showScreen('library');});
   els.collectionValueStat.addEventListener('dblclick',openValueModal);
   els.valueCloseBtn.addEventListener('click',closeValueModal);
@@ -708,26 +711,37 @@ function render(){
   setupVisibleCoverAutoload();
 }
 
-function hasActiveFilters(){
-  return Boolean(
-    els.searchInput.value.trim() ||
-    els.sectionFilter.value !== 'all' ||
-    els.formatFilter.value !== 'All formats' ||
-    els.seenFilter.value !== 'all' ||
-    duplicatesOnly
-  );
+function isFilterActive(){
+  return !!(els.searchInput && els.searchInput.value && els.searchInput.value.trim())
+    || (els.sectionFilter && els.sectionFilter.value && els.sectionFilter.value !== 'all')
+    || (els.formatFilter && els.formatFilter.value && els.formatFilter.value !== 'All formats')
+    || (els.seenFilter && els.seenFilter.value && els.seenFilter.value !== 'all')
+    || duplicatesOnly;
 }
+function toggleDuplicatesOnly(){
+  duplicatesOnly = !duplicatesOnly;
+  render();
+}
+
 function populateStats(filteredList){
-  const list = filteredList || getFiltered();
-  const filtersOn = hasActiveFilters();
+  const filterActive = isFilterActive();
+  const totalCount = state.movies.length;
+  const shown = filteredList ? filteredList.length : totalCount;
+  if(filterActive){
+    els.totalLabel.textContent = 'Selected titles';
+    els.totalCount.textContent = shown.toLocaleString();
+    els.totalStat.classList.add('filtered');
+  } else {
+    els.totalLabel.textContent = 'Total titles';
+    els.totalCount.textContent = totalCount.toLocaleString();
+    els.totalStat.classList.remove('filtered');
+  }
   const dupes = getDuplicateMap();
-  const duplicateEntries = state.movies.filter(m => (dupes[titleKey(m.title)] || 0) > 1).length;
-  els.totalCountLabel.textContent = filtersOn ? 'Selected titles' : 'Total titles';
-  els.totalCount.textContent = (filtersOn ? list.length : state.movies.length).toLocaleString();
-  els.duplicateCount.textContent = duplicateEntries.toLocaleString();
-  els.duplicateLabel.textContent = duplicatesOnly ? 'Duplicates only' : 'Duplicates';
-  els.duplicateHint.textContent = duplicatesOnly ? 'Click for normal view' : 'Click to show duplicates only';
-  els.duplicateStat.classList.toggle('active', duplicatesOnly);
+  const duplicateTitleCount = Object.values(dupes).filter(c => c > 1).length;
+  els.duplicateCount.textContent = duplicateTitleCount.toLocaleString();
+  els.duplicatesStat.classList.toggle('toggled', duplicatesOnly);
+  els.duplicatesStat.setAttribute('aria-pressed', duplicatesOnly ? 'true' : 'false');
+  els.duplicateMicro.textContent = duplicatesOnly ? 'Showing duplicates · click to clear' : 'Click to filter';
   els.fourKCount.textContent=state.movies.filter(m=>m.format==='4K UHD'||m.format==='4K Steelbook'||m.section.includes('4K')||m.title.toUpperCase().includes('4K')).length.toLocaleString();
   els.collectionValue.textContent=formatMoney(state.collectionValue || 0);
 }
