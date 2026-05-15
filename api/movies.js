@@ -1,21 +1,55 @@
 
-import { kv } from '@vercel/kv'
+import { put, list, del } from '@vercel/blob'
+
+const BLOB_NAME = 'movies.json'
+
+async function loadMovies(){
+
+  const blobs = await list()
+
+  const existing = blobs.blobs.find(
+    b => b.pathname === BLOB_NAME
+  )
+
+  if(!existing){
+    return []
+  }
+
+  const response = await fetch(existing.url)
+
+  return await response.json()
+}
+
+async function saveMovies(movies){
+
+  await del(BLOB_NAME).catch(() => {})
+
+  await put(
+    BLOB_NAME,
+    JSON.stringify(movies, null, 2),
+    {
+      access:'public',
+      addRandomSuffix:false
+    }
+  )
+}
 
 export default async function handler(req, res){
 
-  let movies = await kv.get('movies') || []
+  let movies = await loadMovies()
 
   if(req.method === 'GET'){
-    return res.status(200).json({ movies })
+
+    return res.status(200).json({
+      movies
+    })
   }
 
   if(req.method === 'POST'){
 
-    const movie = req.body
+    movies.push(req.body)
 
-    movies.push(movie)
-
-    await kv.set('movies', movies)
+    await saveMovies(movies)
 
     return res.status(200).json({
       success:true

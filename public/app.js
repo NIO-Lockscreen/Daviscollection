@@ -1,16 +1,8 @@
 
 let movies = []
 
-const UNSORTED_TITLES = [
-'SOUTH PARK',
-'LAPUTA',
-'KING OF KINGS',
-'JAWS',
-'TRON',
-'TRON LEGACY'
-]
-
 async function loadMovies(){
+
   const res = await fetch('/api/movies')
   const data = await res.json()
 
@@ -20,45 +12,53 @@ async function loadMovies(){
 }
 
 function render(){
-  const container = document.getElementById('movies')
-  const search = document.getElementById('search').value.toLowerCase()
 
-  const filtered = movies.filter(m =>
-    m.title.toLowerCase().includes(search)
-  )
+  const search = document.getElementById('search')
+    .value
+    .toLowerCase()
+
+  const container = document.getElementById('movies')
 
   container.innerHTML = ''
 
   let total = 0
 
-  filtered.forEach(movie => {
+  movies
+    .filter(m =>
+      m.title.toLowerCase().includes(search)
+    )
+    .forEach(movie => {
 
-    total += Number(movie.price || 0)
+      total += Number(movie.price || 0)
 
-    const div = document.createElement('div')
-    div.className = 'movie'
+      const div = document.createElement('div')
 
-    div.innerHTML = `
-      <h3>${movie.title}</h3>
+      div.className = 'movie'
 
-      <div>Section: ${movie.section}</div>
-      <div>Format: ${movie.format}</div>
-      <div>Price: ${movie.price || 0} kr</div>
+      div.innerHTML = `
+        <h3>${movie.title}</h3>
 
-      <label>
-        Seen
-        <input type="checkbox" ${movie.seen ? 'checked' : ''}
-          onchange="toggleSeen('${movie.id}', this.checked)">
-      </label>
+        <div>Section: ${movie.section}</div>
+        <div>Format: ${movie.format}</div>
+        <div>Price: ${movie.price || 0} kr</div>
 
-      <button onclick="deleteMovie('${movie.id}')">Delete</button>
-    `
+        <label>
+          Seen
+          <input type="checkbox"
+            ${movie.seen ? 'checked' : ''}
+            onchange="toggleSeen('${movie.id}', this.checked)">
+        </label>
 
-    container.appendChild(div)
-  })
+        <button onclick="deleteMovie('${movie.id}')">
+          Delete
+        </button>
+      `
 
-  document.getElementById('collectionValue').innerText =
-    total.toLocaleString() + ' kr'
+      container.appendChild(div)
+    })
+
+  document.getElementById('collectionValue')
+    .innerText = total.toLocaleString() + ' kr'
 }
 
 async function addMovie(){
