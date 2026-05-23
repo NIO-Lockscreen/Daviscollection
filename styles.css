@@ -303,3 +303,75 @@
   @media (max-width:720px){
     .app{padding:18px 12px 42px}.brand{align-items:flex-start}.logo{width:48px;height:48px;border-radius:17px}h1{font-size:2.35rem}.subtitle{font-size:.92rem}.stats{grid-template-columns:1fr 1fr;gap:10px}.stat{padding:13px;min-height:78px;border-radius:20px}.stat strong{font-size:1.55rem}.controls{position:relative;top:auto;grid-template-columns:1fr;padding:12px;border-radius:22px}.movieGrid{grid-template-columns:1fr 1fr;gap:10px}.card{border-radius:22px}.cover{margin:8px 8px 0;border-radius:17px}.body{padding:10px}.title{font-size:.92rem}.notes,.chip:not(:first-child){display:none}.toolbar .ghost,.toolbar .danger{padding:9px 11px;font-size:.85rem}.formGrid{grid-template-columns:1fr}.panel{border-radius:24px;padding:14px}.scanner{min-height:290px}.movieGrid.compact{border-radius:18px}.movieGrid.compact .card{grid-template-columns:24px minmax(0,1fr);gap:8px;padding:9px 10px}.movieGrid.compact .meta,.movieGrid.compact .formatBadge{display:none}.modalPreview{grid-template-columns:86px 1fr}.modalCover{width:86px}.pickerGrid{grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:9px}.pickerSearchRow,.pickerUrlRow{flex-direction:column}
   }
+
+  /* ── Login overlay ────────────────────────────────────────────────────── */
+  .loginOverlay{
+    position:fixed;inset:0;z-index:200;
+    display:flex;align-items:center;justify-content:center;
+    background:radial-gradient(circle at top left, rgba(125,211,252,.22), transparent 34rem),
+               radial-gradient(circle at 76% 14%, rgba(192,132,252,.22), transparent 28rem),
+               linear-gradient(135deg,var(--bg),#0b1020 45%,#14101f);
+    padding:16px;
+  }
+  .loginCard{
+    width:min(420px,100%);
+    background:rgba(255,255,255,.07);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    padding:38px 32px 34px;
+    backdrop-filter:blur(28px);
+    box-shadow:var(--shadow);
+    display:grid;gap:4px;
+  }
+  .loginLogo{
+    width:56px;height:56px;border-radius:20px;margin:0 auto 14px;
+    background:linear-gradient(145deg,rgba(125,211,252,.95),rgba(192,132,252,.9));
+    box-shadow:0 12px 36px rgba(125,211,252,.18);
+    position:relative;
+  }
+  .loginLogo:before,.loginLogo:after{content:"";position:absolute;inset:10px;border:3px solid rgba(7,9,20,.45);border-radius:50%}
+  .loginLogo:after{inset:auto;left:13px;right:13px;top:26px;height:6px;border:0;border-radius:99px;background:rgba(7,9,20,.56)}
+  .loginBrand{margin:0;text-align:center;font-weight:700;font-size:1.05rem;color:var(--accent);letter-spacing:.04em}
+  .loginCard h2{margin:10px 0 4px;font-size:1.5rem;font-weight:700;text-align:center;letter-spacing:-.03em}
+  .loginSub{margin:0 0 4px;text-align:center;color:var(--muted);font-size:.9rem;line-height:1.45}
+  .loginError{min-height:1.2em;color:var(--bad);font-size:.88rem;text-align:center;margin:4px 0 0}
+
+  /* ── Sync status badge ────────────────────────────────────────────────── */
+  .syncBadge{
+    display:inline-block;width:10px;height:10px;border-radius:50%;
+    flex-shrink:0;align-self:center;transition:background .3s ease;
+    cursor:default;
+  }
+  .syncBadge--idle    { background:rgba(169,177,199,.45); }
+  .syncBadge--syncing { background:var(--warn); animation:pulse .8s ease infinite alternate; }
+  .syncBadge--ok      { background:var(--good); }
+  .syncBadge--error   { background:var(--bad); }
+  @keyframes pulse { from{opacity:.55} to{opacity:1} }
+
+  /* ── Settings modal ───────────────────────────────────────────────────── */
+  .settingsCard{width:min(600px,100%)}
+  .settingsSection{
+    margin-top:22px;padding-top:22px;
+    border-top:1px solid var(--line);
+  }
+  .settingsSection:first-of-type{margin-top:0;padding-top:0;border-top:none}
+  .settingsSectionHead{
+    margin:0 0 8px;font-size:1rem;font-weight:700;
+    color:var(--accent);letter-spacing:.01em;
+  }
+  .settingsMeta{margin:0 0 16px;color:var(--muted);font-size:.88rem;line-height:1.5}
+  .syncStatusRow{
+    display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;
+    margin:10px 0 14px;
+    padding:10px 14px;
+    background:rgba(255,255,255,.045);
+    border:1px solid var(--line);
+    border-radius:16px;
+  }
+  .syncStatusLabel{font-size:.88rem;color:var(--soft);flex:1}
+  .syncLastPush{font-size:.82rem;color:var(--muted);white-space:nowrap}
+
+  @media(max-width:480px){
+    .loginCard{padding:26px 18px 22px}
+    .settingsCard{border-radius:20px}
+  }

@@ -27,8 +27,31 @@ const COVER_FAIL_CACHE_DAYS = 2;
 const AUTO_COVER_CONCURRENCY = 2;
 
 function $(id){return document.getElementById(id)}
-function init(){
-  ['totalCount','totalLabel','totalStat','duplicatesStat','duplicateCount','duplicateMicro','smartFilterStat','smartFilterLabel','smartFilterMicro','fourKCount','collectionValue','collectionValueStat','searchInput','sectionFilter','formatFilter','seenFilter','sortSelect','unsortedBtn','viewToggle','movieGrid','resultText','newTitle','newSection','customSection','newFormat','newBarcode','newSeen','newPoster','newNotes','addMovieBtn','posterLookupBtn','barcodeLookupBtn','scanner','scanVideo','scannerText','startScanBtn','stopScanBtn','scanStatus','backupMenuBtn','backupMenu','exportJsonBtn','importBtn','importFile','blueprintPreview','downloadBlueprintBtn','downloadBlueprintTextBtn','printBlueprintBtn','editModal','editPreview','closeModalBtn','editMovieTitle','editSection','editCustomSection','editFormat','editBarcode','editSeen','editPoster','editNotes','deleteMovieBtn','removePosterBtn','editPosterLookupBtn','saveEditBtn','valueModal','valueCloseBtn','valueCurrentText','valueMode','valueAmount','valueNote','valuePreviewText','valueWarning','valueConfirmLine','valueConfirm','rollbackValueBtn','applyValueBtn','valueHistoryList','toast','posterPickerModal','pickerTitle','pickerSubtitle','pickerSearchInput','pickerSearchBtn','pickerStatus','pickerGrid','pickerUrlInput','pickerUrlBtn','pickerCloseBtn'].forEach(id=>els[id]=$(id));
+async function init(){
+  // ── Resolve all DOM element references ────────────────────────────────────
+  [
+    'totalCount','totalLabel','totalStat','duplicatesStat','duplicateCount','duplicateMicro',
+    'smartFilterStat','smartFilterLabel','smartFilterMicro','fourKCount','collectionValue',
+    'collectionValueStat','searchInput','sectionFilter','formatFilter','seenFilter','sortSelect',
+    'unsortedBtn','viewToggle','movieGrid','resultText',
+    'newTitle','newSection','customSection','newFormat','newBarcode','newSeen','newPoster','newNotes',
+    'addMovieBtn','posterLookupBtn','barcodeLookupBtn',
+    'scanner','scanVideo','scannerText','startScanBtn','stopScanBtn','scanStatus',
+    'backupMenuBtn','backupMenu','exportJsonBtn','importBtn','importFile',
+    'blueprintPreview','downloadBlueprintBtn','downloadBlueprintTextBtn','printBlueprintBtn',
+    'editModal','editPreview','closeModalBtn','editMovieTitle','editSection','editCustomSection',
+    'editFormat','editBarcode','editSeen','editPoster','editNotes',
+    'deleteMovieBtn','removePosterBtn','editPosterLookupBtn','saveEditBtn',
+    'valueModal','valueCloseBtn','valueCurrentText','valueMode','valueAmount','valueNote',
+    'valuePreviewText','valueWarning','valueConfirmLine','valueConfirm',
+    'rollbackValueBtn','applyValueBtn','valueHistoryList','toast',
+    'posterPickerModal','pickerTitle','pickerSubtitle','pickerSearchInput','pickerSearchBtn',
+    'pickerStatus','pickerGrid','pickerUrlInput','pickerUrlBtn','pickerCloseBtn',
+    // Auth + sync + settings
+    'settingsBtn','settingsModal','settingsCloseBtn',
+    'syncTokenInput','syncSaveConfigBtn','syncNowBtn','syncStatusText','syncLastPush',
+    'changePassOld','changePassNew','changePassConfirm','changePassSaveBtn','changePassError',
+  ].forEach(id => els[id] = $(id));
   document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>showScreen(btn.dataset.screen)));
   ['searchInput','sectionFilter','formatFilter','seenFilter','sortSelect'].forEach(id=>els[id].addEventListener('input', render));
   els.duplicatesStat.addEventListener('click', toggleDuplicatesOnly);
@@ -69,11 +92,76 @@ function init(){
   els.removePosterBtn.addEventListener('click',()=>{if(editingId) removePoster(editingId,{keepModal:true});});
   els.editPosterLookupBtn.addEventListener('click',()=>lookupPosterForForm('edit'));
   ['editMovieTitle','editPoster','editSection','editFormat','editBarcode','editSeen'].forEach(id=>els[id].addEventListener('input',()=>updateEditPreview()));
-  window.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal(); closePosterPicker(); closeValueModal();}});
+  window.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal(); closePosterPicker(); closeValueModal(); closeSettings();}});
+
+  // ── Auth gate: show login overlay; resolves when user authenticates ────────
+  await authGate();
+
+  // ── Cloud sync: try to pull from Vercel Blob and replace local state ───────
+  await syncOnLoad();
+
+  // ── Settings modal listeners ───────────────────────────────────────────────
+  els.settingsBtn.addEventListener('click', openSettings);
+  els.settingsCloseBtn.addEventListener('click', closeSettings);
+  els.settingsModal.addEventListener('click', e => { if (e.target === els.settingsModal) closeSettings(); });
+  els.syncSaveConfigBtn.addEventListener('click', handleSyncSaveConfig);
+  els.syncNowBtn.addEventListener('click', handleSyncNow);
+  els.changePassSaveBtn.addEventListener('click', handleChangePassword);
+  els.syncTokenInput.addEventListener('input', () => { els.syncTokenInput.dataset.dirty = '1'; });
+
   populateSelects();
   if (window.matchMedia('(max-width: 720px)').matches) showScreen('add');
   render();
   updateBlueprintPreview();
+}
+
+// ── Settings modal ─────────────────────────────────────────────────────────────
+function openSettings() {
+  // Refresh dynamic UI
+  const cfg = syncGetConfig();
+  els.syncTokenInput.value = '';
+  els.syncTokenInput.dataset.dirty = '';
+  els.syncTokenInput.placeholder = cfg.token ? 'Token saved ✓ (paste to replace)' : 'vercel_blob_rw_…';
+  updateSyncBadge(syncHasToken() ? 'ok' : 'idle');
+  // Show/hide old-password field
+  els.oldPassField.style.display = authHasPassword() ? '' : 'none';
+  // Clear password fields
+  ['changePassOld','changePassNew','changePassConfirm'].forEach(id => { els[id].value = ''; });
+  els.changePassError.textContent = '';
+  els.settingsModal.style.display = 'flex';
+}
+function closeSettings() {
+  els.settingsModal.style.display = 'none';
+}
+
+async function handleSyncSaveConfig() {
+  const token = els.syncTokenInput.value.trim();
+  if (!token) { toast('Paste a Vercel Blob token first.'); return; }
+  syncSetConfig({ token });
+  els.syncTokenInput.value = '';
+  els.syncTokenInput.dataset.dirty = '';
+  els.syncTokenInput.placeholder = 'Token saved ✓ (paste to replace)';
+  toast('Token saved — syncing now…');
+  await syncOnLoad();
+  render();
+}
+
+async function handleSyncNow() {
+  if (!syncHasToken()) { toast('No token configured — open Settings and save a token first.'); return; }
+  toast('Syncing…');
+  await syncOnLoad();
+  render();
+}
+
+async function handleChangePassword() {
+  const oldPw  = els.changePassOld.value;
+  const newPw  = els.changePassNew.value;
+  const confPw = els.changePassConfirm.value;
+  els.changePassError.textContent = '';
+  const err = await authChangePassword(oldPw, newPw, confPw);
+  if (err) { els.changePassError.textContent = err; return; }
+  ['changePassOld','changePassNew','changePassConfirm'].forEach(id => { els[id].value = ''; });
+  toast('Password updated ✓');
 }
 
 function loadState(){
@@ -109,7 +197,11 @@ function normalizeState(input){
   movies.forEach(m=>{if(!sectionOrder.includes(m.section)) sectionOrder.push(m.section)});
   return {movies, sectionOrder, importedFrom:input.importedFrom || 'local', importedCount:input.importedCount || movies.length, collectionValue:Number(input.collectionValue || 0), valueHistory:Array.isArray(input.valueHistory)?input.valueHistory:[]};
 }
-function save(){localStorage.setItem(STORAGE_KEY, JSON.stringify(state)); updateBlueprintPreview();}
+function save(){
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+  updateBlueprintPreview();
+  syncPushSilent(); // fire-and-forget cloud push; defined in sync.js
+}
 function cryptoId(){return 'm-'+Date.now().toString(36)+'-'+Math.random().toString(36).slice(2,9)}
 function today(){return new Date().toISOString().slice(0,10)}
 function cleanImportedTitleAndCatalog(title, catalog=''){

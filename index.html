@@ -5,8 +5,32 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Movie Vault — Private Collection</title>
 <link rel="stylesheet" href="styles.css">
+<link rel="preconnect" href="https://blob.vercel-storage.com">
 </head>
 <body>
+
+<!-- ── Login overlay ────────────────────────────────────────────────────── -->
+<div id="loginOverlay" class="loginOverlay" style="display:none">
+  <div class="loginCard">
+    <div class="logo loginLogo" aria-hidden="true"></div>
+    <p class="loginBrand">Movie Vault</p>
+    <h2 id="loginTitle">Welcome back</h2>
+    <p id="loginSubtitle" class="loginSub">Enter your password to access your collection.</p>
+    <div class="formGrid" style="margin-top:18px">
+      <div class="field full">
+        <label for="loginPassword">Password</label>
+        <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password">
+      </div>
+      <div class="field full" id="loginConfirmField" style="display:none">
+        <label for="loginConfirm">Confirm password</label>
+        <input id="loginConfirm" type="password" placeholder="Confirm password" autocomplete="new-password">
+      </div>
+    </div>
+    <p class="loginError" id="loginError"></p>
+    <button class="primary" id="loginSubmitBtn" style="width:100%;margin-top:8px">Unlock</button>
+  </div>
+</div>
+
 <div class="app">
   <header class="topbar">
     <div class="brand">
@@ -26,6 +50,8 @@
           <input type="file" id="importFile" accept="application/json,.json" hidden>
         </div>
       </div>
+      <button class="ghost" id="settingsBtn" aria-label="Settings" title="Settings — sync &amp; password">⚙ Settings</button>
+      <span class="syncBadge syncBadge--idle" id="syncBadge" aria-label="No cloud sync" title="No cloud sync"></span>
     </div>
   </header>
 
@@ -180,9 +206,64 @@
   </div>
 </div>
 
+<!-- ── Settings modal ───────────────────────────────────────────────────── -->
+<div class="modal" id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsTitle">
+  <div class="modalCard settingsCard">
+    <div class="modalHead">
+      <h2 id="settingsTitle">⚙ Settings</h2>
+      <button class="ghost" id="settingsCloseBtn">Close</button>
+    </div>
+
+    <!-- Cloud sync -->
+    <div class="settingsSection">
+      <h3 class="settingsSectionHead">☁ Cloud Sync — Vercel Blob</h3>
+      <p class="settingsMeta">Your collection is pushed to Vercel Blob every time you save a change, and loaded from the cloud when you open the app. You only need a free Vercel account and a Blob store.</p>
+      <div class="formGrid">
+        <div class="field full">
+          <label for="syncTokenInput">Vercel Blob Token</label>
+          <input id="syncTokenInput" type="password" placeholder="vercel_blob_rw_…" autocomplete="off">
+        </div>
+      </div>
+      <div class="syncStatusRow">
+        <span id="syncStatusText" class="syncStatusLabel">Not configured</span>
+        <span id="syncLastPush" class="syncLastPush">Never</span>
+      </div>
+      <div class="actions" style="justify-content:flex-start">
+        <button class="ghost" id="syncNowBtn">Sync now</button>
+        <button class="primary" id="syncSaveConfigBtn">Save token</button>
+      </div>
+    </div>
+
+    <!-- Change password -->
+    <div class="settingsSection">
+      <h3 class="settingsSectionHead">🔒 Security — Change Password</h3>
+      <div class="formGrid">
+        <div class="field full" id="oldPassField">
+          <label for="changePassOld">Current password</label>
+          <input id="changePassOld" type="password" placeholder="Current password" autocomplete="current-password">
+        </div>
+        <div class="field full">
+          <label for="changePassNew">New password</label>
+          <input id="changePassNew" type="password" placeholder="New password (min 4 chars)" autocomplete="new-password">
+        </div>
+        <div class="field full">
+          <label for="changePassConfirm">Confirm new password</label>
+          <input id="changePassConfirm" type="password" placeholder="Confirm new password" autocomplete="new-password">
+        </div>
+      </div>
+      <p class="loginError" id="changePassError"></p>
+      <div class="actions" style="justify-content:flex-start">
+        <button class="primary" id="changePassSaveBtn">Update password</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script src="movies-data.js"></script>
+<script src="auth.js"></script>
+<script src="sync.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
