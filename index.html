@@ -272,7 +272,8 @@
   .pickerThumb img{width:100%;height:100%;object-fit:cover;display:block}
   .pickerThumb .src{position:absolute;left:8px;top:8px;background:rgba(5,8,18,.78);border:1px solid rgba(255,255,255,.18);border-radius:999px;padding:4px 8px;font-size:.66rem;font-weight:800;color:#fff;letter-spacing:.02em;backdrop-filter:blur(8px)}
   .pickerThumb .nm{position:absolute;left:8px;right:8px;bottom:8px;background:rgba(5,8,18,.78);border:1px solid rgba(255,255,255,.18);border-radius:10px;padding:5px 7px;font-size:.7rem;color:#fff;line-height:1.15;backdrop-filter:blur(8px);display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;text-align:left}
-  .pickerEmpty{grid-column:1/-1;text-align:center;color:var(--muted);padding:30px 10px;border:1px dashed rgba(255,255,255,.15);border-radius:18px}
+  .pickerEmpty{grid-column:1/-1;text-align:center;color:var(--muted);padding:30px 10px;border:1px dashed rgba(255,255,255,.15);border-radius:18px;line-height:1.5}
+  .pickerEmptyActions{display:flex;gap:10px;justify-content:center;margin:14px 0;flex-wrap:wrap}
   .actions{display:flex;gap:10px;flex-wrap:wrap;justify-content:flex-end;margin-top:14px}
   .empty{padding:40px 18px;text-align:center;color:var(--muted);border:1px dashed rgba(255,255,255,.2);border-radius:28px;background:rgba(255,255,255,.035)}
   .dropZone{border:1px dashed rgba(255,255,255,.25);border-radius:22px;padding:18px;text-align:center;color:var(--muted);background:rgba(255,255,255,.04)}
@@ -477,10 +478,11 @@
       <h2 id="pickerTitle">Pick a cover</h2>
       <button class="ghost" id="pickerCloseBtn">Close</button>
     </div>
-    <p class="pickerSubtitle" id="pickerSubtitle">Tap a poster to use it. If none look right, edit the search term or paste your own URL below.</p>
+    <p class="pickerSubtitle" id="pickerSubtitle">Tap a poster to use it. If none look right, edit the search term, open Google Images, or paste an image URL below.</p>
     <div class="pickerSearchRow">
       <input id="pickerSearchInput" placeholder="Search term (edit and press Search)">
       <button class="ghost" id="pickerSearchBtn">Search</button>
+      <button class="ghost" id="pickerGoogleBtn" title="Open a Google Images search for this title in a new tab">Google Images</button>
     </div>
     <div id="pickerStatus" class="pickerStatus"></div>
     <div id="pickerGrid" class="pickerGrid"></div>
@@ -508,6 +510,7 @@ let posterPickerState = null;
 let scanStream = null;
 let scanTimer = null;
 let scanDetector = null;
+let nativeScanFailures = 0;
 let quaggaLoaded = false;
 let quaggaRunning = false;
 let coverObserver = null;
@@ -522,7 +525,7 @@ const AUTO_COVER_CONCURRENCY = 2;
 
 function $(id){return document.getElementById(id)}
 function init(){
-  ['totalCount','totalLabel','totalStat','duplicatesStat','duplicateCount','duplicateMicro','smartFilterStat','smartFilterLabel','smartFilterMicro','fourKCount','collectionValue','collectionValueStat','searchInput','sectionFilter','formatFilter','seenFilter','sortSelect','unsortedBtn','viewToggle','movieGrid','resultText','newTitle','newSection','customSection','newFormat','newBarcode','newSeen','newPoster','newNotes','addMovieBtn','posterLookupBtn','barcodeLookupBtn','scanner','scanVideo','scannerText','startScanBtn','stopScanBtn','scanStatus','backupMenuBtn','backupMenu','exportJsonBtn','importBtn','importFile','blueprintPreview','downloadBlueprintBtn','downloadBlueprintTextBtn','printBlueprintBtn','editModal','editPreview','closeModalBtn','editMovieTitle','editSection','editCustomSection','editFormat','editBarcode','editSeen','editPoster','editNotes','deleteMovieBtn','removePosterBtn','editPosterLookupBtn','saveEditBtn','valueModal','valueCloseBtn','valueCurrentText','valueMode','valueAmount','valueNote','valuePreviewText','valueWarning','valueConfirmLine','valueConfirm','rollbackValueBtn','applyValueBtn','valueHistoryList','toast','posterPickerModal','pickerTitle','pickerSubtitle','pickerSearchInput','pickerSearchBtn','pickerStatus','pickerGrid','pickerUrlInput','pickerUrlBtn','pickerCloseBtn','loadCoversBtn','randomPickBtn','exportCsvBtn'].forEach(id=>els[id]=$(id));
+  ['totalCount','totalLabel','totalStat','duplicatesStat','duplicateCount','duplicateMicro','smartFilterStat','smartFilterLabel','smartFilterMicro','fourKCount','collectionValue','collectionValueStat','searchInput','sectionFilter','formatFilter','seenFilter','sortSelect','unsortedBtn','viewToggle','movieGrid','resultText','newTitle','newSection','customSection','newFormat','newBarcode','newSeen','newPoster','newNotes','addMovieBtn','posterLookupBtn','barcodeLookupBtn','scanner','scanVideo','scannerText','startScanBtn','stopScanBtn','scanStatus','backupMenuBtn','backupMenu','exportJsonBtn','importBtn','importFile','blueprintPreview','downloadBlueprintBtn','downloadBlueprintTextBtn','printBlueprintBtn','editModal','editPreview','closeModalBtn','editMovieTitle','editSection','editCustomSection','editFormat','editBarcode','editSeen','editPoster','editNotes','deleteMovieBtn','removePosterBtn','editPosterLookupBtn','saveEditBtn','valueModal','valueCloseBtn','valueCurrentText','valueMode','valueAmount','valueNote','valuePreviewText','valueWarning','valueConfirmLine','valueConfirm','rollbackValueBtn','applyValueBtn','valueHistoryList','toast','posterPickerModal','pickerTitle','pickerSubtitle','pickerSearchInput','pickerSearchBtn','pickerStatus','pickerGrid','pickerUrlInput','pickerUrlBtn','pickerCloseBtn','loadCoversBtn','randomPickBtn','exportCsvBtn','pickerGoogleBtn'].forEach(id=>els[id]=$(id));
   document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>showScreen(btn.dataset.screen)));
   ['searchInput','sectionFilter','formatFilter','seenFilter','sortSelect'].forEach(id=>els[id].addEventListener('input', render));
   els.duplicatesStat.addEventListener('click', toggleDuplicatesOnly);
@@ -541,6 +544,7 @@ function init(){
   els.pickerCloseBtn.addEventListener('click',closePosterPicker);
   els.posterPickerModal.addEventListener('click',e=>{if(e.target===els.posterPickerModal) closePosterPicker();});
   els.pickerSearchBtn.addEventListener('click',()=>refreshPickerCandidates(els.pickerSearchInput.value.trim()));
+  els.pickerGoogleBtn.addEventListener('click',()=>openImageSearch('google'));
   els.pickerSearchInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault(); refreshPickerCandidates(els.pickerSearchInput.value.trim());}});
   els.pickerUrlBtn.addEventListener('click',()=>commitPickerSelection(els.pickerUrlInput.value.trim(),'custom'));
   els.pickerUrlInput.addEventListener('keydown',e=>{if(e.key==='Enter'){e.preventDefault(); commitPickerSelection(els.pickerUrlInput.value.trim(),'custom');}});
@@ -833,11 +837,14 @@ function getSectionFromForm(prefix){
 function addMovie(){
   const title=els.newTitle.value.trim();
   if(!title){toast('Add a title first.'); els.newTitle.focus(); return;}
-  const movie={id:cryptoId(), title, section:getSectionFromForm('new'), format:els.newFormat.value, barcode:els.newBarcode.value.trim(), poster:els.newPoster.value.trim(), posterRemoved:false, notes:els.newNotes.value.trim(), seen:!!els.newSeen.checked, added:today(), updated:today()};
+  const barcode=els.newBarcode.value.trim();
+  const sameBarcode=barcode && state.movies.find(m=>m.barcode===barcode);
+  const movie={id:cryptoId(), title, section:getSectionFromForm('new'), format:els.newFormat.value, barcode, poster:els.newPoster.value.trim(), posterRemoved:false, notes:els.newNotes.value.trim(), seen:!!els.newSeen.checked, added:today(), updated:today()};
   state.movies.unshift(movie);
   save();
   ['newTitle','customSection','newBarcode','newPoster','newNotes'].forEach(id=>els[id].value=''); els.newSeen.checked=false; els.newSection.value=UNSORTED_SECTION;
-  populateSelects(); render(); toast(`Added ${title}`);
+  populateSelects(); render();
+  toast(sameBarcode ? `Added ${title} — note: same barcode as “${shortCoverTitle(sameBarcode.title)}”.` : `Added ${title}`);
 }
 function openEdit(id){
   const m=state.movies.find(x=>x.id===id); if(!m) return;
@@ -1124,6 +1131,13 @@ function openPosterPicker(opts){
   els.posterPickerModal.classList.add('active');
   refreshPickerCandidates(els.pickerSearchInput.value);
 }
+function openImageSearch(engine){
+  const term=((els.pickerSearchInput.value.trim() || posterPickerState?.title || '')+' movie poster').trim();
+  const url=engine==='bing'
+    ? 'https://www.bing.com/images/search?q='+encodeURIComponent(term)
+    : 'https://www.google.com/search?tbm=isch&q='+encodeURIComponent(term);
+  window.open(url,'_blank','noopener');
+}
 function closePosterPicker(){
   if(posterPickerState) posterPickerState.generation++;
   posterPickerState = null;
@@ -1155,8 +1169,11 @@ async function refreshPickerCandidates(searchTerm){
 }
 function renderPickerCandidates(candidates){
   if(!candidates.length){
-    els.pickerStatus.textContent = 'No candidates found.';
-    els.pickerGrid.innerHTML = '<div class="pickerEmpty">Nothing matched. Try a different search term, or paste a URL below.</div>';
+    els.pickerStatus.textContent = 'No candidates found from iTunes, Wikipedia or Wikidata.';
+    els.pickerGrid.innerHTML = `<div class="pickerEmpty">Nothing matched. Check the title spelling (try the original title or adding the year), or find a cover yourself:
+      <div class="pickerEmptyActions"><button class="ghost" data-imgsearch="google">Search Google Images</button><button class="ghost" data-imgsearch="bing">Search Bing Images</button></div>
+      In the search results: long-press / right-click the cover → copy image address → paste it in the URL field below.</div>`;
+    els.pickerGrid.querySelectorAll('[data-imgsearch]').forEach(btn=>btn.addEventListener('click',()=>openImageSearch(btn.dataset.imgsearch)));
     return;
   }
   els.pickerStatus.textContent = `${candidates.length} candidate${candidates.length===1?'':'s'} — tap one to use it.`;
@@ -1381,8 +1398,39 @@ async function gatherPosterCandidates(searchTerm, options={}){
     const extra=await gatherItunesCandidateList(cleaned, year, settings, options);
     extra.forEach(c=>push(c));
   }catch(_){ }
+  // Fallback for titles the strict matchers miss (misremembered or very old titles):
+  // Wikipedia's full-text search is fuzzy, so "3 days in the condor" still finds
+  // "Three Days of the Condor". Picker-only — auto-load stays strict.
+  try{
+    const loose=await looseWikipediaCandidates(cleaned.title);
+    loose.forEach(c=>push(c));
+  }catch(_){ }
   all.sort((a,b)=>b.score-a.score);
   return all.slice(0,30);
+}
+async function looseWikipediaCandidates(term){
+  const url=new URL('https://en.wikipedia.org/w/api.php');
+  url.searchParams.set('action','query');
+  url.searchParams.set('generator','search');
+  url.searchParams.set('gsrsearch', `${term} film`);
+  url.searchParams.set('gsrlimit','10');
+  url.searchParams.set('gsrnamespace','0');
+  url.searchParams.set('prop','pageimages');
+  url.searchParams.set('piprop','thumbnail');
+  url.searchParams.set('pithumbsize','800');
+  url.searchParams.set('format','json');
+  url.searchParams.set('formatversion','2');
+  url.searchParams.set('origin','*');
+  const data=await fetchJson(url.toString());
+  return pagesFromWikiResponse(data)
+    .filter(p=>p.thumbnail?.source)
+    .map(p=>({
+      provider:'Wikipedia search',
+      confidence:Math.min(.7, .25 + similarity(term, stripArticleQualifier(p.title))*.45),
+      title:p.title,
+      year:extractYearFromText(p.title),
+      posterUrl:p.thumbnail.source
+    }));
 }
 async function gatherItunesCandidateList(cleaned, year, settings, options={}){
   const variants=buildTitleVariants(cleaned.title, year).slice(0,4);
@@ -1407,7 +1455,8 @@ async function gatherItunesCandidateList(cleaned, year, settings, options={}){
         const yearScore=year && itemYear===year ? .14 : year && itemYear!==year ? -.07 : 0;
         const movieBonus=item.wrapperType==='track' && item.kind==='feature-movie' ? .04 : 0;
         const confidence=Math.min(.86, titleScore + yearScore + movieBonus);
-        if(confidence>=.36){
+        // Low floor on purpose: this list feeds the manual picker where the user judges.
+        if(confidence>=.15){
           out.push({provider:'iTunes', confidence, title:item.trackName || item.collectionName || '', year:itemYear, posterUrl:upgradeArtworkUrl(item.artworkUrl100), raw:item});
         }
       }
@@ -1733,6 +1782,7 @@ function buildTitleVariants(title, year=''){
   add(base.split('’').join(''));
   add(base.split("'").join(''));
   add(leetToWords(base));
+  add(numberWordVariant(base));
   const known={'se7en':'Seven','wall e':'WALL-E','walle':'WALL-E','mi':'Mission: Impossible','fifth element':'The Fifth Element','wonderful life':'It’s a Wonderful Life','the mermaid':'The Little Mermaid','hunchback':'The Hunchback of Notre Dame'};
   const key=simpleText(base);
   if(known[key]) add(known[key]);
@@ -1741,6 +1791,11 @@ function buildTitleVariants(title, year=''){
 }
 function compactSpaces(value){return String(value || '').split(' ').filter(Boolean).join(' ').trim();}
 function leetToWords(title){return String(title || '').split('0').join('o').split('1').join('i').split('3').join('e').split('4').join('a').split('5').join('s').split('7').join('v');}
+/* "3 Days of the Condor" style titles: standalone digits also searched as words. */
+function numberWordVariant(title){
+  const words={'1':'one','2':'two','3':'three','4':'four','5':'five','6':'six','7':'seven','8':'eight','9':'nine','10':'ten','11':'eleven','12':'twelve','13':'thirteen'};
+  return String(title || '').replace(/\b(1[0-3]|[1-9])\b/g, m=>words[m] || m);
+}
 function normalizeSearchText(t){return simpleText(t);}
 function simpleText(value){
   return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').replace(/\b(the|a|an)\b/g,' ').replace(/\s+/g,' ').trim();
@@ -1779,25 +1834,35 @@ function levenshteinDistance(a,b){
 async function lookupBarcode(code, fillForm=false){
   code=String(code||'').trim();
   if(!code){toast('Scan or type a barcode first.'); return;}
+  const owned=state.movies.find(m=>m.barcode && m.barcode===code);
+  if(owned) toast(`Heads up: this barcode is already in the collection as “${shortCoverTitle(owned.title)}”.`);
   try{
     setScanStatus('Looking up barcode…');
     const res=await fetch('https://api.upcitemdb.com/prod/trial/lookup?upc='+encodeURIComponent(code));
+    if(!res.ok){
+      barcodeLookupFallback(code, res.status===429
+        ? 'Barcode service hit its free-tier rate limit.'
+        : `Barcode service error (HTTP ${res.status}).`);
+      return;
+    }
     const data=await res.json();
     const item=data.items?.[0];
     if(item){
       if(fillForm || !els.newTitle.value.trim()) els.newTitle.value = cleanLookupTitle(item.title || '');
       if(item.images?.[0] && !els.newPoster.value.trim()) els.newPoster.value = item.images[0];
       if(!els.newNotes.value.trim()) els.newNotes.value = [item.brand, item.description].filter(Boolean).join(' — ').slice(0,350);
-      toast('Barcode found. Check title and section before adding.');
+      if(!owned) toast('Barcode found. Check title and section before adding.');
       setScanStatus('Barcode found.');
     }else{
-      toast('Barcode scanned, but no product data found. Add title manually.');
-      setScanStatus('No product data found. Add title manually.');
+      barcodeLookupFallback(code, 'Barcode scanned, but no product data found.');
     }
   }catch(e){
-    toast('Barcode scanned. Lookup failed, so add title manually.');
-    setScanStatus('Lookup failed. You can still add it manually.');
+    barcodeLookupFallback(code, 'Barcode lookup failed (network or service down).');
   }
+}
+function barcodeLookupFallback(code, reason){
+  setScanStatus(reason+' Search Google for the barcode, then type the title manually.');
+  toastWithAction(reason, 'Search Google', ()=>window.open('https://www.google.com/search?q='+encodeURIComponent(code+' blu-ray dvd movie'),'_blank','noopener'));
 }
 function cleanLookupTitle(t){return String(t||'').replace(/\s+(?:\(?\s*(?:blu[- ]?ray|dvd|4k|uhd|ultra hd)\s*\)?).*$/i,'').trim()}
 function setScanStatus(msg){els.scanStatus.textContent=msg || ''}
@@ -1818,12 +1883,13 @@ async function startScanner(){
     els.scanVideo.srcObject=scanStream;
     els.scanVideo.setAttribute('playsinline','');
     await els.scanVideo.play();
-    if('BarcodeDetector' in window){
-      scanDetector = new BarcodeDetector({formats:['ean_13','ean_8','upc_a','upc_e','code_128','code_39']});
+    scanDetector = await createNativeDetector();
+    if(scanDetector){
+      nativeScanFailures=0;
       nativeScanLoop();
       setScanStatus('Camera started. Scanning with native barcode detector…');
     }else{
-      setScanStatus('Camera works, but native detector is unavailable. Trying fallback scanner…');
+      setScanStatus('Camera works, but this browser has no working native detector. Using fallback scanner…');
       stopNativeStreamOnly();
       await startQuaggaFallback();
     }
@@ -1833,6 +1899,17 @@ async function startScanner(){
     els.scannerText.textContent='Camera could not start.';
     setScanStatus(msg);
   }
+}
+/* Some browsers (notably desktop Chrome and some Android WebViews) expose BarcodeDetector
+   but support zero barcode formats, or throw on detect(). Verify before trusting it. */
+async function createNativeDetector(){
+  if(!('BarcodeDetector' in window)) return null;
+  try{
+    const supported = BarcodeDetector.getSupportedFormats ? await BarcodeDetector.getSupportedFormats() : [];
+    const wanted = ['ean_13','ean_8','upc_a','upc_e','code_128','code_39'].filter(f=>supported.includes(f));
+    if(!wanted.length) return null;
+    return new BarcodeDetector({formats:wanted});
+  }catch(_){return null;}
 }
 
 async function openBestCameraStream(){
@@ -1865,12 +1942,23 @@ async function nativeScanLoop(){
   if(!scanDetector || !els.scanVideo.srcObject) return;
   try{
     const codes = await scanDetector.detect(els.scanVideo);
+    nativeScanFailures=0;
     if(codes && codes.length){
       const code = codes[0].rawValue;
       onBarcodeFound(code);
       return;
     }
-  }catch(e){}
+  }catch(e){
+    // detect() throwing every frame means the native detector is broken on this device
+    nativeScanFailures++;
+    if(nativeScanFailures>40){
+      scanDetector=null;
+      setScanStatus('Native detector is not working here. Switching to fallback scanner…');
+      stopNativeStreamOnly();
+      await startQuaggaFallback();
+      return;
+    }
+  }
   scanTimer=requestAnimationFrame(nativeScanLoop);
 }
 async function startQuaggaFallback(){
