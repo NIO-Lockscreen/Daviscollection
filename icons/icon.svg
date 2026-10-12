@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <title>Movie Vault</title>
+  <!-- Mirrors the .logo in css/styles.css: rounded square, 145deg #7dd3fc -> #c084fc gradient, a ring (the disc) and a slot bar. -->
+  <defs>
+    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="51.5" y1="-36.1" x2="460.5" y2="548.1">
+      <stop offset="0" stop-color="#7dd3fc"/>
+      <stop offset="1" stop-color="#c084fc"/>
+    </linearGradient>
+    <radialGradient id="glow" cx="256" cy="256" r="101" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#fff" stop-opacity=".16"/>
+      <stop offset="1" stop-color="#fff" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+  <rect width="512" height="512" rx="176" fill="url(#g)"/>
+  <rect width="512" height="512" rx="176" fill="url(#glow)"/>
+  <circle cx="256" cy="256" r="154.5" fill="none" stroke="#070914" stroke-opacity=".45" stroke-width="26.5"/>
+  <rect x="114.8" y="229.5" width="282.4" height="53" rx="26.5" fill="#070914" fill-opacity=".56"/>
+</svg>
