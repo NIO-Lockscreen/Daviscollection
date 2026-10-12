@@ -1,0 +1,110 @@
+# Movie Vault
+
+Privat oversikt over Blu-ray-, 4K- og DVD-samlingen (ca. 2300 titler). Appen er vanlig HTML, CSS og JavaScript uten byggesteg. Den kan åpnes rett fra en fil, kjøres fra en enkel webserver, eller ligge på nett som en app som kan installeres på mobil og PC, og som åpner seg selv uten nett.
+
+Selve appen er på engelsk. Denne README-en er på norsk.
+
+## Hva appen kan
+
+- **Samlingsoversikt.** Alle titler vises som kort med cover, eller som kompakt liste («List view»). Du kan søke på tittel, strekkode og notater, filtrere på seksjon, format og sett/ikke sett, og sortere (A–Z, nyeste først, usette først, duplikater først). Øverst står tellere for antall titler, duplikater og usorterte titler, og en samlet samlingsverdi som kan justeres med historikk og «Rollback».
+- **Hyller/seksjoner.** Titlene er ordnet i seksjoner (hyller) slik de sto i den opprinnelige samlelista, for eksempel «TV ROOM». Hver tittel kan flyttes til en annen seksjon, og du kan opprette nye seksjoner.
+- **Hylla «UNSORTED / NOT PLACED».** Nye innkjøp havner automatisk her til du har bestemt hvor de skal stå. Knappen «Unsorted» viser bare disse titlene.
+- **Sett / ikke sett.** Hver tittel kan merkes som sett. Filteret «Seen» og sorteringen «Unseen first» gjør det enkelt å finne noe du ikke har sett ennå.
+- **Strekkodeskanning på mobil.** Fanen «Add / scan» bruker kameraet til å lese strekkoden på plata, og kan slå opp et tittelforslag. Kameraet krever https eller localhost, så det virker på den publiserte siden, men ikke hvis du åpner `index.html` direkte fra disk.
+- **Automatiske covers.** Se avsnittet «Coverbilder» under.
+- **«Blueprint»-eksport av samlelista.** Fanen «Blueprint export» lager en samleliste i samme stil som den gamle Word-lista: tittel øverst, seksjonsnavn og stjerne-punkter. Den kan lastes ned som HTML (kan åpnes i Word) eller TXT, eller skrives ut / lagres som PDF.
+- **Backup.** Menyen «Backup ▾» eksporterer og importerer hele samlingen som en JSON-fil.
+
+## Publisering
+
+### Vercel (slik siden ligger nå)
+
+GitHub-repoet har `https://daviscollection.vercel.app` som hjemmeside, og siden publiseres fra Vercel rett fra `main`-grenen.
+
+- **Oppdatering skjer automatisk.** Når du pusher eller merger til `main`, lager Vercel en ny utgave av siden av seg selv, vanligvis på under ett minutt. Det er ingenting å bygge: filene serveres akkurat som de ligger i repoet.
+- **Ingen `vercel.json` er nødvendig.** Vercel sender `Cache-Control: public, max-age=0, must-revalidate` for statiske filer, så nettleseren sjekker alltid om det finnes en nyere versjon. Service workeren (`sw.js`) henter dessuten alltid ferske filer når du er på nett.
+- **Hvis en endring ikke dukker opp:** åpne prosjektet i Vercel-dashboardet og sjekk at siste deployment under «Deployments» er «Ready», og at Production Branch er `main`. Under Settings → Build and Deployment skal Framework Preset være «Other», og Output Directory skal stå tom (siden ligger i rotmappa).
+
+### Alternativ: GitHub Pages
+
+1. Gå til repoet på GitHub → **Settings → Pages**.
+2. Under «Build and deployment» velger du **Source: Deploy from a branch**.
+3. Velg **Branch: `main`** og mappe **`/ (root)`**, og trykk Save.
+4. Etter et minutt eller to ligger siden på `https://nio-lockscreen.github.io/Daviscollection/`.
+
+(Pages på et *privat* repo krever betalt GitHub-plan. Det er ikke aktuelt så lenge repoet er offentlig.) Filen `.nojekyll` i rotmappa gjør at GitHub Pages serverer filene som de er. Alle stier i appen er relative, så den virker også i en undermappe som `/Daviscollection/`.
+
+### Hva er offentlig og hva er privat?
+
+Repoet er offentlig, og siden på nett kan åpnes av alle som kjenner adressen. I repoet ligger **bare startlista med filmtitler** (`js/seed-data.js`). **Ingen av dine egne endringer ligger i repoet eller på serveren.** Nye filmer, covers du har valgt, sett/ikke sett, samlingsverdi og innstillinger lagres bare i nettleseren din (se «Hvor lagres dataene?»).
+
+## Kjøre lokalt
+
+Velg det som passer:
+
+- `npx serve .` i prosjektmappa, og åpne adressen som skrives ut.
+- `python3 -m http.server 8000`, og åpne `http://localhost:8000`.
+- Dobbeltklikk på `index.html`. Det fungerer for det aller meste, men da registreres ikke service workeren (ingen installasjon og ingen offline-støtte), og kameraskanneren virker ikke. **Kameraet/strekkodeskanneren krever https eller localhost.**
+
+Husk at hver adresse har sin egen lagring (se under): data du legger inn på `localhost` finnes ikke på `daviscollection.vercel.app`, og omvendt.
+
+## Hvor lagres dataene?
+
+- Alt du endrer lagres i **denne nettleserens `localStorage`**. Det betyr at dataene er **per enhet og per nettleser**, og at det **ikke finnes noen synkronisering**. Telefonen og PC-en har hver sin kopi.
+- **Flytt data mellom mobil og PC** med **Backup ▾ → Export JSON backup** på den ene enheten og **Import JSON backup** på den andre.
+- **Ta jevnlig backup som sikkerhetskopi**, for eksempel etter at du har lagt inn flere nye innkjøp. Legg filen et trygt sted (e-post til deg selv, skylagring e.l.). Hvis nettleserdata slettes, privat modus brukes, eller appen fjernes, forsvinner endringene dine hvis du ikke har en backup.
+- **iPhone/Safari:** Safari kan slette data fra nettsteder du ikke har brukt på ca. 7 dager, med mindre appen er lagt til på hjemskjermen. Legg derfor appen til på hjemskjermen (se under) **og** ta backup (Export JSON).
+- Startlista fra `js/seed-data.js` brukes bare første gang, når nettleseren ikke har lagrede data fra før.
+
+## Installere som app
+
+Appen kan installeres, åpner da i eget vindu uten nettleser-menyer, og har eget ikon.
+
+- **iPhone (Safari):** åpne siden i Safari → trykk **Del**-knappen → **Legg til på Hjem-skjerm** (Add to Home Screen) → Legg til.
+- **Android (Chrome):** åpne siden → meny (⋮) → **Installer app** (Install app), eller **Legg til på startskjermen** (Add to home screen).
+- **PC (Chrome eller Edge):** trykk på installasjonsikonet ytterst i adressefeltet, eller velg menyen → **Installer Movie Vault**.
+
+Etter installasjon virker appens egne filer uten nett. Samlinga di ligger i nettleserens lagring og vises også uten nett. Coverbilder, oppslag av strekkoder og reserveskanneren (lastes fra en CDN) trenger derimot nett. Coverbilder hentes fra internett og vises uten nett bare hvis nettleseren har dem i sin egen hurtigbuffer.
+
+## Coverbilder
+
+- **Automatisk.** Når et kort uten cover kommer til syne mens du blar, søker appen etter plakat hos **iTunes (Apple)** og **Wikipedia**, og lagrer treffet. Svarene mellomlagres en stund i nettleseren, så hver tittel slås bare opp én gang.
+- **Manuelt.** Trykk **Find poster** (i «Add / scan» eller i detaljvisningen til en film). Da åpnes en velger med forslag. Trykk på riktig plakat, endre søketeksten og søk på nytt, eller lim inn en egen bilde-URL. «Remove poster» fjerner coveret igjen.
+- **Valgfri TMDB-nøkkel for bedre treff.** I plakatvelgeren finner du knappen **Cover settings**. Der kan du lime inn en API-nøkkel fra The Movie Database (TMDB). Nøkkelen lagres bare i nettleseren. Uten nøkkel bruker appen iTunes og Wikipedia.
+
+### Slik får du en gratis TMDB-nøkkel
+
+1. Opprett en gratis konto på <https://www.themoviedb.org/signup> og bekreft e-postadressen.
+2. Logg inn og gå til <https://www.themoviedb.org/settings/api> (profilbildet → Settings → API).
+3. Velg **Create** (eller «Request an API key») og deretter typen **Developer**. Godta vilkårene.
+4. Fyll ut skjemaet kort: navn på applikasjonen (f.eks. «Movie Vault»), adressen til siden din, og en kort beskrivelse (f.eks. «Personal, non-commercial movie collection manager»), samt kontaktinformasjon. Privat, ikke-kommersiell bruk er gratis.
+5. Kopier **API Key** (v3, en lang rekke tegn) fra API-siden, og lim den inn under **Cover settings** i plakatvelgeren.
+
+TMDB krever kildehenvisning: *This product uses the TMDB API but is not endorsed or certified by TMDB.*
+
+## Filoversikt
+
+```
+index.html             Siden (markup) og <head> med manifest, ikoner og meta-tagger
+manifest.webmanifest   Gjør appen installerbar (navn, farger, ikoner)
+sw.js                  Service worker: offline-støtte for appens egne filer
+.nojekyll              Tom fil, trengs bare for GitHub Pages
+css/styles.css         Alt av utseende
+js/seed-data.js        Startlista med titler (brukes bare første gang)
+js/storage.js          Lagring i localStorage, normalisering, JSON-backup, blueprint-eksport
+js/covers.js           Automatisk cover-oppslag og plakatvelgeren
+js/scanner.js          Strekkodeoppslag og kameraskanner
+js/app.js              Tilstand, oppstart, visning av kort, redigering og verdi
+js/pwa.js              Registrerer service workeren (bare på http/https, ikke fra fil)
+icons/                 Appikonet (icon.svg og de ferdige PNG-filene)
+```
+
+Skriptene er vanlige `<script>`-tagger (ikke moduler) som lastes i den rekkefølgen som står i `index.html`, slik at appen også virker når `index.html` åpnes direkte fra disk. `js/pwa.js` lastes sist.
+
+### Oppdateringer og cache-versjon
+
+Service workeren henter alltid filene fra nettet først, og bruker den lagrede kopien bare når du er uten nett. Når du publiserer en endring og åpner appen på nett, får du derfor den nye versjonen med det samme (på installert app: lukk og åpne den én gang, eller last siden på nytt). Dataene dine i nettleseren påvirkes ikke av oppdateringer.
+
+Skal du tvinge alle installerte kopier til å laste ned alt på nytt, endrer du `CACHE_VERSION` øverst i `sw.js` (for eksempel fra `'v1'` til `'v2'`). Den nye service workeren henter da alle filer på nytt og sletter den gamle cachen. Legger du til en ny fil i appen (for eksempel et nytt skript i `js/`), tar du den også med i `SHELL`-lista i `sw.js` og øker versjonen, slik at den er tilgjengelig uten nett fra første stund.
+
+Ikonene er laget ut fra `icons/icon.svg` (vanlig ikon) og `icons/icon-maskable.svg` (full-bleed, brukes til maskable-ikonet og iPhone-ikonet).
