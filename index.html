@@ -18,12 +18,16 @@
     </div>
     <div class="toolbar">
       <div class="backupWrap">
-        <button class="ghost" id="backupMenuBtn" aria-expanded="false" aria-controls="backupMenu">Backup ▾</button>
+        <button class="ghost" id="backupMenuBtn" aria-expanded="false" aria-controls="backupMenu">Backup ▾<span class="backupDot" id="backupDot" aria-hidden="true"></span></button>
         <div class="backupMenu" id="backupMenu">
-          <small>Backup/import is kept here so the main screen stays clean.</small>
+          <small class="backupStatus" id="backupStatus">Last backup: never</small>
           <button class="ghost" id="exportJsonBtn">Export JSON backup</button>
+          <button class="ghost" id="shareBackupBtn" hidden>Share backup…</button>
+          <button class="ghost" id="exportCsvBtn">Export spreadsheet (CSV)</button>
           <button class="ghost" id="importBtn">Import JSON backup</button>
+          <button class="ghost" id="undoImportBtn" hidden>Undo last import</button>
           <input type="file" id="importFile" accept="application/json,.json" hidden>
+          <small class="storageNote" id="storageNote">Saved in this browser on this device only. It does NOT sync between devices — use Export / Import to move it.</small>
         </div>
       </div>
     </div>
@@ -156,6 +160,23 @@
         <label>Value history</label>
         <div id="valueHistoryList" class="historyList"></div>
       </div>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="importModal" role="dialog" aria-modal="true" aria-labelledby="importTitle">
+  <div class="modalCard importCard">
+    <div class="modalHead"><h2 id="importTitle">Import backup</h2></div>
+    <p class="importSummary" id="importSummary"></p>
+    <ul class="importOptions">
+      <li><strong>Merge</strong> <span id="importMergeInfo"></span></li>
+      <li><strong>Replace all</strong> <span id="importReplaceInfo"></span></li>
+    </ul>
+    <p class="importSafe">Your current collection is saved first, so you can use <strong>Backup ▾ → Undo last import</strong> if this is not what you wanted.</p>
+    <div class="actions">
+      <button class="ghost" id="importCancelBtn">Cancel</button>
+      <button class="danger" id="importReplaceBtn">Replace all</button>
+      <button class="primary" id="importMergeBtn">Merge</button>
     </div>
   </div>
 </div>
