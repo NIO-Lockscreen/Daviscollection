@@ -52,6 +52,7 @@ function init(){
   els.editPosterLookupBtn.addEventListener('click',()=>lookupPosterForForm('edit'));
   ['editMovieTitle','editPoster','editSection','editFormat','editBarcode','editSeen'].forEach(id=>els[id].addEventListener('input',()=>updateEditPreview()));
   window.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal(); closePosterPicker(); closeValueModal();}});
+  initBackupUi();
   populateSelects();
   if (window.matchMedia('(max-width: 720px)').matches) showScreen('add');
   render();
@@ -62,7 +63,12 @@ function escapeHtml(str=''){return String(str).replace(/[&<>"]/g,c=>({'&':'&amp;
 function cleanNotes(str=''){return String(str).replace(/\bImported from blueprint\b/gi,'').replace(/^\s*[—\-:]+\s*/,'').replace(/\s*[—\-:]+\s*$/,'').trim();}
 function titleKey(t){return (t||'').toLowerCase().replace(/[^a-z0-9æøå]+/g,' ').trim()}
 function hueFor(str){let h=0; for(let i=0;i<str.length;i++) h=(h*31+str.charCodeAt(i))%360; return h;}
-function toast(msg){els.toast.textContent=msg; els.toast.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>els.toast.classList.remove('show'),2600)}
+function toast(msg,ms=2600){
+  // ms>=8000 marks a warning: it is styled differently and ordinary toasts do not bury it while it is showing
+  if(ms<8000 && Date.now()<(toast._hold||0)) return;
+  toast._hold = ms>=8000 ? Date.now()+ms : 0;
+  els.toast.textContent=msg; els.toast.classList.toggle('warn',ms>=8000); els.toast.classList.add('show'); clearTimeout(toast._t); toast._t=setTimeout(()=>els.toast.classList.remove('show'),ms);
+}
 
 function showScreen(screen){
   activeScreen=screen;
