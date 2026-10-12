@@ -221,6 +221,36 @@
   </div>
 </div>
 
+<div class="modal" id="coverSettingsModal" role="dialog" aria-modal="true" aria-labelledby="coverSettingsTitle">
+  <div class="modalCard coverSettingsCard">
+    <div class="modalHead"><h2 id="coverSettingsTitle">Cover settings</h2><button class="ghost" id="coverSettingsCloseBtn">Close</button></div>
+    <div class="coverSettingsBody">
+      <div class="field">
+        <label for="tmdbKeyInput">TMDB API key (optional)</label>
+        <input id="tmdbKeyInput" type="password" autocomplete="off" autocapitalize="off" spellcheck="false" placeholder="v3 API key or v4 read access token">
+        <p class="coverHint">With a free TMDB key, covers are looked up on TheMovieDB first, which gives the most reliable posters. Paste either the v3 API key or the long v4 read access token (starts with “eyJ”). The key stays in this browser only and is never included in backups. This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+      </div>
+      <div class="field">
+        <label for="itunesCountrySelect">iTunes country</label>
+        <select id="itunesCountrySelect"></select>
+        <p class="coverHint">Which regional iTunes store is searched for covers.</p>
+      </div>
+      <div class="field">
+        <label>Missing covers</label>
+        <button class="ghost" id="coverBulkBtn">Load missing covers</button>
+        <progress id="coverBulkProgress" max="1" value="0" hidden></progress>
+        <p class="coverHint" id="coverBulkStatus"></p>
+      </div>
+      <div class="field">
+        <label>Cover cache</label>
+        <button class="ghost" id="coverClearCacheBtn">Clear cover cache &amp; retry missing covers</button>
+        <p class="coverHint">Forget earlier lookups, including “no match” answers, and search again for the covers currently on screen.</p>
+      </div>
+    </div>
+    <div class="actions"><button class="primary" id="coverSettingsSaveBtn">Save settings</button></div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script src="js/seed-data.js"></script>
