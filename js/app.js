@@ -11,6 +11,7 @@ let editingId = null;
 function $(id){return document.getElementById(id)}
 function init(){
   ['totalCount','totalLabel','totalStat','duplicatesStat','duplicateCount','duplicateMicro','smartFilterStat','smartFilterLabel','smartFilterMicro','fourKCount','collectionValue','collectionValueStat','searchInput','sectionFilter','formatFilter','seenFilter','sortSelect','unsortedBtn','viewToggle','movieGrid','resultText','newTitle','newSection','customSection','newFormat','newBarcode','newSeen','newPoster','newNotes','addMovieBtn','posterLookupBtn','barcodeLookupBtn','scanner','scanVideo','scannerText','startScanBtn','stopScanBtn','scanStatus','backupMenuBtn','backupMenu','exportJsonBtn','importBtn','importFile','blueprintPreview','downloadBlueprintBtn','downloadBlueprintTextBtn','printBlueprintBtn','editModal','editPreview','closeModalBtn','editMovieTitle','editSection','editCustomSection','editFormat','editBarcode','editSeen','editPoster','editNotes','deleteMovieBtn','removePosterBtn','editPosterLookupBtn','saveEditBtn','valueModal','valueCloseBtn','valueCurrentText','valueMode','valueAmount','valueNote','valuePreviewText','valueWarning','valueConfirmLine','valueConfirm','rollbackValueBtn','applyValueBtn','valueHistoryList','toast','posterPickerModal','pickerTitle','pickerSubtitle','pickerSearchInput','pickerSearchBtn','pickerStatus','pickerGrid','pickerUrlInput','pickerUrlBtn','pickerCloseBtn'].forEach(id=>els[id]=$(id));
+  initCovers();
   document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>showScreen(btn.dataset.screen)));
   ['searchInput','sectionFilter','formatFilter','seenFilter','sortSelect'].forEach(id=>els[id].addEventListener('input', render));
   els.duplicatesStat.addEventListener('click', toggleDuplicatesOnly);
@@ -370,52 +371,6 @@ function rollbackValueEntry(id){
   const entry={id:cryptoId(), date:new Date().toISOString(), mode:'rollback', amount:state.collectionValue-current, before:current, after:state.collectionValue, note:'Rollback to selected history item', rollbackOf:h.id};
   state.valueHistory=[entry, ...(state.valueHistory||[])].slice(0,100);
   save(); populateStats(); renderValueHistory(); updateValuePreview();
-}
-
-function markCardLoading(id,on){
-  const card=[...els.movieGrid.querySelectorAll('.card')].find(c=>c.dataset.id===id);
-  const cover=card?.querySelector('.cover');
-  if(cover) cover.classList.toggle('loading',!!on);
-}
-function updateCardPoster(id,poster,title){
-  const card=[...els.movieGrid.querySelectorAll('.card')].find(c=>c.dataset.id===id);
-  if(!card) return;
-  markCardLoading(id,false);
-  card.dataset.needsPoster='false';
-  const cover=card.querySelector('.cover');
-  if(cover){
-    const existing=cover.querySelector('img');
-    if(existing) existing.src=poster;
-    else cover.insertAdjacentHTML('afterbegin', `<img src="${escapeHtml(poster)}" alt="Cover for ${escapeHtml(title)}" loading="lazy" onerror="this.remove()">`);
-  }
-  const findBtn=card.querySelector('[data-searchposter]');
-  if(findBtn) findBtn.remove();
-  card.querySelectorAll('.posterRemovedPill').forEach(chip=>chip.remove());
-  const actions=card.querySelector('.cardActions');
-  if(actions && !actions.querySelector('[data-remove-poster]')){
-    const removeBtn=document.createElement('button');
-    removeBtn.className='miniBtn';
-    removeBtn.dataset.removePoster=id;
-    removeBtn.textContent='Remove poster';
-    removeBtn.addEventListener('click',e=>{e.stopPropagation(); removePoster(id);});
-    actions.appendChild(removeBtn);
-  }
-}
-function removePoster(id, opts={}){
-  const m=state.movies.find(x=>x.id===id); if(!m) return;
-  if(!m.poster && m.posterRemoved===true){toast('Poster is already removed for this title.'); return;}
-  m.poster='';
-  m.posterRemoved=true;
-  m.updated=today();
-  autoCoverQueued.delete(id);
-  autoCoverFailedSession.add(id);
-  save();
-  if(opts.keepModal){
-    els.editPoster.value='';
-    updateEditPreview();
-  }
-  render();
-  toast('Poster removed. Auto cover loading is disabled for this title.');
 }
 
 init();

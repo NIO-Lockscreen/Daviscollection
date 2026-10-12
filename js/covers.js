@@ -1,14 +1,187 @@
-/* ---------- Cover / poster lookup: manual picker + automatic lookup for visible cards ---------- */
+/* ---------- Cover / poster lookup: manual picker + automatic lookup for visible cards ----------
+   Loadable on its own: nothing below touches els/state/the DOM at load time (initCovers() does that), and
+   findAutoCover() needs none of them, so an audit page can include just this file. */
 let posterPickerState = null;
 let coverObserver = null;
-const autoCoverQueue = [];
+const autoCoverQueue = [];        // cards that scrolled into view (served first)
+const autoCoverBulkQueue = [];    // "Load missing covers" (served when nothing visible is waiting)
 const autoCoverQueued = new Set();
 const autoCoverRunning = new Set();
 const autoCoverFailedSession = new Set();
-const COVER_CACHE_PREFIX = 'movieVault.smartCoverCache:v7:';
+const coverInflight = new Map();  // cacheKey -> pending lookup, so duplicate editions share one request chain
+// Every cache key starts with the family prefix; storage.js purges the whole family when localStorage is full.
+const COVER_CACHE_FAMILY = 'movieVault.smartCoverCache:';
+const COVER_CACHE_PREFIX = COVER_CACHE_FAMILY+'v8:';
+const COVER_REJECT_PREFIX = 'movieVault.coverRejects:v1:';   // per-title list of cover URLs the user (or a 404) rejected
+const TMDB_KEY_STORAGE = 'movieVault.tmdbApiKey';            // never part of `state`, so never part of a backup
+const ITUNES_COUNTRY_STORAGE = 'movieVault.itunesCountry';
+const ITUNES_COUNTRIES = {US:'United States',GB:'United Kingdom',NO:'Norway',SE:'Sweden',DK:'Denmark',DE:'Germany'};
 const COVER_SUCCESS_CACHE_DAYS = 60;
 const COVER_FAIL_CACHE_DAYS = 2;
 const AUTO_COVER_CONCURRENCY = 2;
+const COVER_RATE_LIMIT_PAUSE_MS = 60000;
+let autoCoverPausedUntil = 0;
+let autoCoverResumeTimer = 0;
+let itunesUseJsonp = false;       // set once fetch() to iTunes failed with a network/CORS TypeError and JSONP worked
+let tmdbRejected = false;         // TMDB answered 401 this session: skip it until the key changes
+let coverBulk = null;             // running "Load missing covers" job
+let coverBulkSummary = '';
+
+function initCovers(){
+  purgeStaleCoverCache();
+  document.addEventListener('error', onCoverImageError, true);   // image errors do not bubble: capture them on the document
+  setupCoverSettingsUi();
+}
+function coverLsGet(key){try{return localStorage.getItem(key);}catch(_){return null;}}
+function coverLsSet(key, value){
+  try{
+    if(value===''||value==null) localStorage.removeItem(key); else localStorage.setItem(key, value);
+    return true;
+  }catch(_){return false;}
+}
+function coverError(kind, message, status){const e=new Error(message); e.kind=kind; if(status) e.status=status; return e;}
+/* UI feedback only when the app's toast exists (an audit page loading just covers.js has none). */
+function coverNotify(message){try{if(typeof toast==='function' && typeof els!=='undefined' && els.toast) toast(message);}catch(_){}}
+
+/* ---------- Cover settings dialog (TMDB key, iTunes country, cache, bulk load) ---------- */
+function setupCoverSettingsUi(){
+  const closeBtn=$('pickerCloseBtn'), searchBtn=$('pickerSearchBtn');
+  if(closeBtn && !$('pickerSettingsBtn')){
+    const wrap=document.createElement('div');
+    wrap.className='coverHeadBtns';
+    const btn=document.createElement('button');
+    btn.type='button'; btn.id='pickerSettingsBtn'; btn.className='ghost coverSmallBtn'; btn.title='Cover settings'; btn.setAttribute('aria-label','Cover settings');
+    btn.innerHTML='&#9881;<span class="lbl"> Cover settings</span>';
+    btn.addEventListener('click', openCoverSettings);
+    closeBtn.replaceWith(wrap);
+    wrap.append(btn, closeBtn);
+  }
+  if(searchBtn && !$('pickerGoogleBtn')){
+    const g=document.createElement('button');
+    g.type='button'; g.id='pickerGoogleBtn'; g.className='ghost'; g.textContent='Google Images'; g.title='Open a Google Images search for this title in a new tab';
+    g.addEventListener('click', openImageSearch);
+    searchBtn.after(g);
+  }
+  const sub=$('pickerSubtitle');
+  if(sub) sub.textContent='Tap a poster to use it. If none look right, edit the search term, open Google Images, or paste an image URL below.';
+  const modal=$('coverSettingsModal');
+  if(!modal) return;
+  $('coverSettingsCloseBtn').addEventListener('click', closeCoverSettings);
+  modal.addEventListener('click', e=>{if(e.target===modal) closeCoverSettings();});
+  $('coverSettingsSaveBtn').addEventListener('click', saveCoverSettings);
+  $('coverClearCacheBtn').addEventListener('click', ()=>{
+    const n=clearCoverCache();
+    toast(`Cover cache cleared (${n} entr${n===1?'y':'ies'}). Retrying missing covers…`);
+  });
+  $('coverBulkBtn').addEventListener('click', toggleBulkCovers);
+  // initCovers() runs before app.js registers its own Escape handler, so Escape closes only this dialog when it is on top.
+  window.addEventListener('keydown', e=>{
+    if(e.key==='Escape' && modal.classList.contains('active')){e.stopImmediatePropagation(); closeCoverSettings();}
+  });
+}
+function openCoverSettings(){
+  const modal=$('coverSettingsModal'); if(!modal) return;
+  $('tmdbKeyInput').value=getTmdbKey();
+  const current=getCoverSettings().itunesCountry;
+  const countries={...ITUNES_COUNTRIES};
+  if(!countries[current]) countries[current]=current;
+  const select=$('itunesCountrySelect');
+  select.innerHTML=Object.entries(countries).map(([code,name])=>`<option value="${escapeHtml(code)}">${escapeHtml(code===name?code:code+' — '+name)}</option>`).join('');
+  select.value=current;
+  updateBulkUi();
+  modal.classList.add('active');
+}
+function closeCoverSettings(){$('coverSettingsModal')?.classList.remove('active');}
+function saveCoverSettings(){
+  const oldKey=getTmdbKey(), oldCountry=getCoverSettings().itunesCountry;
+  const key=String($('tmdbKeyInput').value||'').trim().replace(/^bearer\s+/i,'').replace(/^["']|["']$/g,'');
+  const country=($('itunesCountrySelect').value || 'US').toUpperCase();
+  coverLsSet(TMDB_KEY_STORAGE, key);
+  coverLsSet(ITUNES_COUNTRY_STORAGE, country);
+  closeCoverSettings();
+  tmdbRejected=false;
+  if(key!==oldKey || country!==oldCountry) clearCoverCache();   // different provider/region: old "no match" answers no longer apply
+  toast('Cover settings saved.');
+  if(key && key!==oldKey) tmdbRequest('/configuration', {}, key).then(()=>toast('TMDB key verified.'), ()=>{/* a 401 already showed its own message */});
+  if(posterPickerState) refreshPickerCandidates(els.pickerSearchInput.value.trim());
+}
+function getTmdbKey(){return String(coverLsGet(TMDB_KEY_STORAGE) || '').trim();}
+function clearCoverCache(){
+  let removed=0;
+  try{
+    const keys=[];
+    for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i); if(k && k.startsWith(COVER_CACHE_FAMILY)) keys.push(k);}
+    keys.forEach(k=>localStorage.removeItem(k));
+    removed=keys.length;
+  }catch(_){}
+  autoCoverFailedSession.clear();
+  autoCoverPausedUntil=0;
+  clearTimeout(autoCoverResumeTimer);
+  setupVisibleCoverAutoload();
+  return removed;
+}
+/* Remove cover caches of older versions (and expired/corrupt entries of this one). Runs once at startup. */
+function purgeStaleCoverCache(){
+  try{
+    const drop=[];
+    for(let i=0;i<localStorage.length;i++){
+      const k=localStorage.key(i);
+      if(!k || !k.startsWith(COVER_CACHE_FAMILY)) continue;
+      if(!k.startsWith(COVER_CACHE_PREFIX)){drop.push(k); continue;}
+      try{if(Date.now()>JSON.parse(localStorage.getItem(k)).expiresAt) drop.push(k);}catch(_){drop.push(k);}
+    }
+    drop.forEach(k=>localStorage.removeItem(k));
+  }catch(_){}
+}
+
+/* ---------- Bulk "Load missing covers" ---------- */
+function missingCoverIds(){return state.movies.filter(m=>!m.poster && m.posterRemoved!==true).map(m=>m.id);}
+function toggleBulkCovers(){
+  if(coverBulk){cancelBulkCovers(); return;}
+  const ids=missingCoverIds();
+  if(!ids.length){toast('Every title already has a cover, or had it removed on purpose.'); updateBulkUi(); return;}
+  coverBulkSummary='';
+  coverBulk={ids:new Set(ids), total:ids.length, found:0, timer:setInterval(updateBulkUi, 500)};
+  ids.forEach(id=>{autoCoverFailedSession.delete(id); queueAutoCover(id, true);});   // same queue and same findAutoCover(): concurrency limit and 429 pause apply
+  updateBulkUi();
+}
+function cancelBulkCovers(){
+  if(!coverBulk) return;
+  for(let i=autoCoverBulkQueue.length-1;i>=0;i--){
+    if(coverBulk.ids.has(autoCoverBulkQueue[i])){autoCoverQueued.delete(autoCoverBulkQueue[i]); autoCoverBulkQueue.splice(i,1);}
+  }
+  finishBulkCovers(true);
+}
+function bulkNote(id, found){
+  if(!coverBulk || !coverBulk.ids.delete(id)) return;
+  if(found) coverBulk.found++;
+  if(coverBulk.ids.size) updateBulkUi(); else finishBulkCovers(false);
+}
+function finishBulkCovers(cancelled){
+  const job=coverBulk;
+  clearInterval(job.timer);
+  coverBulk=null;
+  const checked=job.total-job.ids.size;
+  coverBulkSummary=`${cancelled?'Stopped':'Finished'}: ${job.found} cover${job.found===1?'':'s'} found, ${checked-job.found} without a match${cancelled&&job.ids.size?`, ${job.ids.size} not checked`:''}.`;
+  updateBulkUi();
+  toast(coverBulkSummary);
+  if(cancelled) setupVisibleCoverAutoload();   // cards that were waiting in the bulk queue get observed again
+}
+function updateBulkUi(){
+  const btn=$('coverBulkBtn'), status=$('coverBulkStatus'), bar=$('coverBulkProgress');
+  if(!btn || !status) return;
+  if(coverBulk){
+    const done=coverBulk.total-coverBulk.ids.size, wait=autoCoverPausedUntil-Date.now();
+    btn.textContent='Cancel loading';
+    bar.hidden=false; bar.max=coverBulk.total; bar.value=done;
+    status.textContent=`${done} of ${coverBulk.total} checked · ${coverBulk.found} found`+(wait>0?` · paused ${Math.ceil(wait/1000)} s (rate limit)`:'');
+  }else{
+    btn.textContent='Load missing covers';
+    bar.hidden=true;
+    const n=missingCoverIds().length;
+    status.textContent=coverBulkSummary || (n ? `${n} title${n===1?'':'s'} without a cover.` : 'Every title has a cover (or had it removed on purpose).');
+  }
+}
 
 /* ---------- Poster picker (manual cover selection) ---------- */
 async function quickPosterLookup(id){
@@ -18,6 +191,8 @@ async function quickPosterLookup(id){
     section: m.section,
     format: m.format,
     onSelect: poster => {
+      if(m.poster && m.poster!==poster) rejectCover(m.title, m.poster);
+      unrejectCover(m.title, poster);
       m.poster=poster; m.posterRemoved=false; m.updated=today(); save();
       updateCardPoster(id, poster, m.title);
       toast('Cover added.');
@@ -30,9 +205,12 @@ function lookupPosterForForm(prefix){
   if(!title){toast('Type a title first.'); (isNew?els.newTitle:els.editMovieTitle).focus(); return;}
   const section=isNew ? (els.customSection.value.trim() || els.newSection.value) : (els.editCustomSection.value.trim() || els.editSection.value);
   const format=isNew ? els.newFormat.value : els.editFormat.value;
+  const current=!isNew && editingId ? state.movies.find(x=>x.id===editingId) : null;
   openPosterPicker({
     title, section, format,
     onSelect: poster => {
+      if(current?.poster && current.poster!==poster) rejectCover(title, current.poster);   // replacing a cover: never suggest the old one again
+      unrejectCover(title, poster);
       (isNew?els.newPoster:els.editPoster).value=poster;
       if(!isNew) updateEditPreview();
       toast('Cover selected.');
@@ -59,6 +237,10 @@ function closePosterPicker(){
   posterPickerState = null;
   els.posterPickerModal.classList.remove('active');
 }
+function openImageSearch(){
+  const term=((els.pickerSearchInput.value.trim() || posterPickerState?.title || '')+' movie poster').trim();
+  window.open('https://www.google.com/search?tbm=isch&q='+encodeURIComponent(term), '_blank', 'noopener');
+}
 function commitPickerSelection(url, source){
   url = String(url||'').trim();
   if(!url){toast('Paste a URL first.'); return;}
@@ -71,29 +253,39 @@ async function refreshPickerCandidates(searchTerm){
   if(!posterPickerState) return;
   const gen = ++posterPickerState.generation;
   const state0 = posterPickerState;
+  const warnings = [];
   els.pickerStatus.textContent = 'Searching candidates…';
   els.pickerGrid.innerHTML = '';
   try{
-    const candidates = await gatherPosterCandidates(searchTerm || state0.title, {section:state0.section, format:state0.format, originalTitle: state0.title});
+    const candidates = await gatherPosterCandidates(searchTerm || state0.title, {section:state0.section, format:state0.format, originalTitle: state0.title, warn:(name,e)=>warnings.push(coverWarning(name,e))});
     if(!posterPickerState || posterPickerState.generation !== gen) return; // picker was closed or re-searched
-    renderPickerCandidates(candidates);
+    renderPickerCandidates(candidates, [...new Set(warnings)]);
   }catch(e){
     if(!posterPickerState || posterPickerState.generation !== gen) return;
     els.pickerStatus.textContent = 'Search failed. Try a different term, or paste a URL below.';
     els.pickerGrid.innerHTML = '';
   }
 }
-function renderPickerCandidates(candidates){
+function coverWarning(name, e){
+  if(e?.kind==='ratelimit') return `${name} is rate-limiting requests; try again in a minute.`;
+  if(e?.kind==='auth') return `${name} rejected the API key (see Cover settings).`;
+  return `${name} could not be reached.`;
+}
+function renderPickerCandidates(candidates, warnings=[]){
+  const note=warnings.length ? ' '+warnings.join(' ') : '';
   if(!candidates.length){
-    els.pickerStatus.textContent = 'No candidates found.';
-    els.pickerGrid.innerHTML = '<div class="pickerEmpty">Nothing matched. Try a different search term, or paste a URL below.</div>';
+    els.pickerStatus.textContent = 'No candidates found.'+note;
+    els.pickerGrid.innerHTML = `<div class="pickerEmpty">Nothing matched. Check the spelling, try the original title, or find a cover yourself:
+      <div class="pickerEmptyActions"><button class="ghost" id="pickerEmptyGoogleBtn">Search Google Images</button></div>
+      In the results, long-press or right-click the cover, choose “Copy image address”, then paste it into the URL field below.</div>`;
+    $('pickerEmptyGoogleBtn').addEventListener('click', openImageSearch);
     return;
   }
-  els.pickerStatus.textContent = `${candidates.length} candidate${candidates.length===1?'':'s'} — tap one to use it.`;
+  els.pickerStatus.textContent = `${candidates.length} candidate${candidates.length===1?'':'s'} — tap one to use it.`+note;
   els.pickerGrid.innerHTML = candidates.map((c,i)=>`
-    <button class="pickerThumb" data-pickerpick="${i}" title="${escapeHtml(c.label||'')}">
+    <button class="pickerThumb${c.rejected?' rejected':''}" data-pickerpick="${i}" title="${escapeHtml(c.rejected?'Rejected before for this title. '+(c.label||''):(c.label||''))}">
       <img src="${escapeHtml(c.url)}" alt="${escapeHtml(c.label||'Candidate')}" loading="lazy" onerror="this.closest('.pickerThumb').style.display='none'">
-      <span class="src">${escapeHtml(c.source)}${c.year?(' · '+c.year):''}</span>
+      <span class="src">${escapeHtml(c.source)}${c.year?(' · '+c.year):''}${c.rejected?' · rejected':''}</span>
       ${c.label?`<span class="nm">${escapeHtml(c.label)}</span>`:''}
     </button>`).join('');
   els.pickerGrid.querySelectorAll('[data-pickerpick]').forEach(btn=>{
@@ -104,7 +296,8 @@ function renderPickerCandidates(candidates){
     });
   });
 }
-/* ---------- Smart auto cover lookup + visible-card lazy loading ---------- */
+
+/* ---------- Visible-card lazy loading + queue ---------- */
 function setupVisibleCoverAutoload(){
   if(coverObserver){coverObserver.disconnect(); coverObserver=null;}
   if(!els.movieGrid || compact || activeScreen!=='library') return;
@@ -125,126 +318,401 @@ function setupVisibleCoverAutoload(){
   }, {root:null, rootMargin:'650px 0px', threshold:0.01});
   cards.forEach(card=>coverObserver.observe(card));
 }
-function queueAutoCover(id){
+function queueAutoCover(id, bulk=false){
   if(!id || autoCoverQueued.has(id) || autoCoverRunning.has(id) || autoCoverFailedSession.has(id)) return;
   const movie=state.movies.find(m=>m.id===id);
   if(!movie || movie.poster || movie.posterRemoved===true) return;
   autoCoverQueued.add(id);
-  autoCoverQueue.push(id);
+  (bulk ? autoCoverBulkQueue : autoCoverQueue).push(id);
   pumpAutoCoverQueue();
 }
+function requeueAutoCover(id){
+  autoCoverQueued.add(id);
+  (coverBulk?.ids.has(id) ? autoCoverBulkQueue : autoCoverQueue).unshift(id);
+}
 function pumpAutoCoverQueue(){
-  while(autoCoverRunning.size < AUTO_COVER_CONCURRENCY && autoCoverQueue.length){
-    const id=autoCoverQueue.shift();
+  while(Date.now()>=autoCoverPausedUntil && autoCoverRunning.size < AUTO_COVER_CONCURRENCY && (autoCoverQueue.length || autoCoverBulkQueue.length)){
+    const id=autoCoverQueue.length ? autoCoverQueue.shift() : autoCoverBulkQueue.shift();
     autoCoverQueued.delete(id);
     autoCoverRunning.add(id);
-    autoLoadVisibleCover(id).finally(()=>{
-      autoCoverRunning.delete(id);
-      pumpAutoCoverQueue();
-    });
+    autoLoadVisibleCover(id)
+      .then(outcome=>{if(outcome!=='requeued') bulkNote(id, outcome==='found');}, ()=>bulkNote(id, false))
+      .finally(()=>{
+        autoCoverRunning.delete(id);
+        pumpAutoCoverQueue();
+      });
   }
 }
+/* Any provider answering HTTP 429 pauses the whole auto queue; the title that hit it is re-queued, not marked failed. */
+function noteCoverRateLimit(){
+  const wasPaused=Date.now()<autoCoverPausedUntil;
+  autoCoverPausedUntil=Date.now()+COVER_RATE_LIMIT_PAUSE_MS;
+  clearTimeout(autoCoverResumeTimer);
+  autoCoverResumeTimer=setTimeout(pumpAutoCoverQueue, COVER_RATE_LIMIT_PAUSE_MS+100);
+  if(!wasPaused) coverNotify('Cover lookups are rate-limited. Pausing for a minute…');
+}
+/* Returns 'found' | 'none' | 'skipped' | 'requeued'. The lookup itself is findAutoCover(); this only applies its answer. */
 async function autoLoadVisibleCover(id){
   const movie=state.movies.find(m=>m.id===id);
-  if(!movie || movie.poster || movie.posterRemoved===true) return;
-  const card=[...els.movieGrid.querySelectorAll('.card')].find(c=>c.dataset.id===id);
-  if(!card) return;
-  const cacheKey=smartCoverCacheKey(movie.title, {section:movie.section, format:movie.format});
-  const cached=getSmartCoverCache(cacheKey);
-  if(cached){
-    if(cached.posterUrl){
-      if(!movie.poster && movie.posterRemoved!==true){movie.poster=cached.posterUrl; movie.posterRemoved=false; movie.updated=today(); save(); updateCardPoster(id, cached.posterUrl, movie.title);}
-    }else{
-      autoCoverFailedSession.add(id);
-    }
-    return;
-  }
+  if(!movie || movie.poster || movie.posterRemoved===true || autoCoverFailedSession.has(id)) return 'skipped';
   markCardLoading(id,true);
   try{
-    const result=await lookupSmartCover(movie.title, {section:movie.section, format:movie.format}, false);
-    if(result?.posterUrl){
-      setSmartCoverCache(cacheKey, result, COVER_SUCCESS_CACHE_DAYS);
-      const stillMovie=state.movies.find(m=>m.id===id);
-      if(stillMovie && !stillMovie.poster && stillMovie.posterRemoved!==true){
-        stillMovie.poster=result.posterUrl;
-        stillMovie.posterRemoved=false;
-        stillMovie.updated=today();
-        save();
-        updateCardPoster(id, result.posterUrl, stillMovie.title);
-      }
-    }else{
-      setSmartCoverCache(cacheKey, {posterUrl:'', reason:'No strong cover match', fetchedAt:new Date().toISOString()}, COVER_FAIL_CACHE_DAYS);
-      autoCoverFailedSession.add(id);
-    }
+    const result=await findAutoCover(movie, {useCache:true});   // caches successes and genuine "no match" itself
+    if(!result?.posterUrl){autoCoverFailedSession.add(id); return 'none';}
+    const m=state.movies.find(x=>x.id===id);
+    if(!m || m.poster || m.posterRemoved===true) return 'skipped';
+    m.poster=result.posterUrl; m.posterRemoved=false; m.updated=today();
+    save();
+    updateCardPoster(id, result.posterUrl, m.title);
+    return 'found';
   }catch(e){
-    setSmartCoverCache(cacheKey, {posterUrl:'', reason:e.message || String(e), fetchedAt:new Date().toISOString()}, COVER_FAIL_CACHE_DAYS);
-    autoCoverFailedSession.add(id);
+    if(e?.kind==='ratelimit'){requeueAutoCover(id); return 'requeued';}
+    autoCoverFailedSession.add(id);   // network error / timeout / HTTP error: skip for this session, but do not cache a failure
+    return 'none';
   }finally{
     markCardLoading(id,false);
   }
 }
 function getCoverSettings(){
   return {
-    itunesCountry:(localStorage.getItem('movieVault.itunesCountry') || 'US').toUpperCase(),
+    itunesCountry:String(coverLsGet(ITUNES_COUNTRY_STORAGE) || 'US').toUpperCase(),
+    tmdbKey:getTmdbKey(),
     cacheDays:COVER_SUCCESS_CACHE_DAYS
   };
 }
+
+/* ---------- Cover cache (compact: only what is needed to re-use a hit) + per-title reject list ---------- */
 function smartCoverCacheKey(title, options={}){
   const cleaned=normalizeTitle(title);
   const year=options.year || cleaned.year || inferYearFromTitle(cleaned.title);
-  return `${cleaned.cacheKey}:${year || ''}:nokey-visible-v7`;
+  return `${cleaned.cacheKey}:${year || ''}:auto-v8${options.hint?'-'+options.hint:''}${options.catalogYear?'-c'+options.catalogYear:''}`;
 }
 function getSmartCoverCache(key){
   try{
-    const cached=JSON.parse(localStorage.getItem(COVER_CACHE_PREFIX+key) || 'null');
-    if(!cached) return null;
-    if(Date.now()>cached.expiresAt){localStorage.removeItem(COVER_CACHE_PREFIX+key); return null;}
+    const raw=localStorage.getItem(COVER_CACHE_PREFIX+key);
+    if(!raw) return null;
+    const cached=JSON.parse(raw);
+    if(!cached || Date.now()>cached.expiresAt){localStorage.removeItem(COVER_CACHE_PREFIX+key); return null;}
     return cached.value;
   }catch(_){return null;}
 }
 function setSmartCoverCache(key, value, days){
+  const v=value?.posterUrl
+    ? {posterUrl:value.posterUrl, provider:value.provider || '', title:value.title || '', year:value.year || '', confidence:Math.round((Number(value.confidence) || 0)*100)/100}
+    : {posterUrl:''};
   try{
-    localStorage.setItem(COVER_CACHE_PREFIX+key, JSON.stringify({expiresAt:Date.now()+days*24*60*60*1000, value}));
+    localStorage.setItem(COVER_CACHE_PREFIX+key, JSON.stringify({expiresAt:Date.now()+days*24*60*60*1000, value:v}));
   }catch(_){/* localStorage can fill up; cover lookup should still work without cache */}
 }
-async function lookupSmartCover(rawTitle, options={}, useCache=true){
-  const cleaned=normalizeTitle(rawTitle);
-  const year=options.year || cleaned.year || inferYearFromTitle(cleaned.title);
-  if(!cleaned.title) return null;
-  const cacheKey=smartCoverCacheKey(rawTitle, {...options, year});
+/* Drops every cache entry of this title (the key also varies with section hint / catalog year). */
+function deleteCoverCacheFor(title){
+  try{
+    const prefix=COVER_CACHE_PREFIX+normalizeTitle(title).cacheKey+':';
+    const keys=[];
+    for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i); if(k && k.startsWith(prefix)) keys.push(k);}
+    keys.forEach(k=>localStorage.removeItem(k));
+  }catch(_){}
+}
+function coverUrlKey(url){return String(url||'').replace(/^https?:/,'').replace(/\d+x\d+(bb|sr)?/gi,'X');}
+function getRejectedCovers(cacheKey){
+  try{const list=JSON.parse(coverLsGet(COVER_REJECT_PREFIX+cacheKey) || '[]'); return Array.isArray(list) ? list : [];}catch(_){return [];}
+}
+function coverRejectChecker(cacheKey){
+  const keys=new Set(getRejectedCovers(cacheKey).map(coverUrlKey));
+  return url=>keys.has(coverUrlKey(url));
+}
+/* Remember that this URL is wrong for this title (removed, replaced or dead) so auto-load and the picker stop suggesting it. */
+function rejectCover(title, url){
+  if(!title || !url) return;
+  const cacheKey=smartCoverCacheKey(title);
+  const list=getRejectedCovers(cacheKey);
+  if(!list.some(u=>coverUrlKey(u)===coverUrlKey(url))) list.push(url);
+  coverLsSet(COVER_REJECT_PREFIX+cacheKey, JSON.stringify(list.slice(-12)));
+  deleteCoverCacheFor(title);
+}
+function unrejectCover(title, url){
+  const cacheKey=smartCoverCacheKey(title);
+  const list=getRejectedCovers(cacheKey);
+  const rest=list.filter(u=>coverUrlKey(u)!==coverUrlKey(url));
+  if(rest.length!==list.length) coverLsSet(COVER_REJECT_PREFIX+cacheKey, rest.length ? JSON.stringify(rest) : '');
+}
+
+/* ======================================================================================================
+   Automatic lookup. Precision first: a missing cover shows a neat title tile, a wrong cover misleads.
+   Auto mode therefore never fuzzy-matches: a candidate must have exactly the collection's title (articles, case, punctuation
+   and a few collection suffixes ignored). Wikipedia decides WHICH film it is (and whether several films share the title);
+   TMDB / iTunes then supply a sharper poster of that same film, with Wikipedia's own poster as the fallback.
+   Anything ambiguous returns null and is left to the manual picker.
+   ====================================================================================================== */
+const AUTO_AMBIGUOUS = Symbol('ambiguous');
+// Section -> weak hint, used ONLY to choose between several films that share the title (never to override a unique match).
+const SECTION_HINT_WORDS = {
+  asian:/\b(Hong Kong|Chinese|China|Japanese|Japan|Korean|South Korea|Taiwanese|Taiwan|Thai|Thailand|Indian|Vietnamese|Filipino|Indonesian|Malaysian|Singaporean|Asian|martial arts|kung fu|wuxia|samurai)\b/i,
+  family:/\b(animated|animation|Disney|Pixar|DreamWorks|children'?s|family|musical)\b/i
+};
+function sectionHint(section){
+  const s=String(section||'').trim().toUpperCase();
+  if(/^(KUNG FU|88 |EUREKA|SHOUT 4K)/.test(s)) return 'asian';
+  if(/^(4K DISNEY|TV ROOM)/.test(s)) return 'family';
+  return '';
+}
+/* "NATIONAL TREASURE 1 & 2", "SHREK 1,2 & 3", "POLICE STORY TRILOGY", "OH, GOD! COLL.", "BRUCE LEE BOX": one disc set, no single poster.
+   (A lone "BOX" is the film.) */
+function isMultiFilmTitle(title){
+  const t=String(title||'');
+  return /\d\s*(?:,|&|\+|\band\b|[-–])\s*\d/i.test(t) || /\b(?:trilogy|quadrilogy|anthology|box\s*set)\b/i.test(t) || /\bcoll(?:ection)?\.?(?=\s|$)/i.test(t) || /\bcomplete\b.*\bseries\b/i.test(t) || /\S\s+box$/i.test(t);
+}
+/* movie = {title, section, format, catalog}. Resolves to null (nothing safe to assign) or
+   {posterUrl, provider, title, year, confidence, pageUrl}. Side-effect free: it never touches `state`, the DOM or storage,
+   except that useCache:true reads and writes the compact cover cache. Throws an Error with kind 'ratelimit' (HTTP 429) or
+   'network' when providers could not answer, which is different from a decided "no match". */
+async function findAutoCover(movie, {useCache=false, validateImage=true}={}){
+  const raw=String(movie?.title ?? '');
+  const paren=raw.match(/\s*\(((?:18|19|20)\d{2})\)\s*$/);   // "HEAT (1995)": an explicit release year
+  const cleaned=normalizeTitle(paren ? raw.slice(0,paren.index) : raw);
+  if(!cleaned.title || isMultiFilmTitle(cleaned.title) || /^(TV \/ Series|Box set)$/i.test(String(movie?.format||''))) return null;
+  const year=(paren && paren[1]) || cleaned.year || inferYearFromTitle(cleaned.title);
+  const catalog=String(movie?.catalog ?? '').trim();
+  const catalogYear=/^(?:189\d|19\d\d|20[0-3]\d)$/.test(catalog) ? catalog : '';   // the importer keeps a trailing number of the title in `catalog`
+  const hint=sectionHint(movie?.section);
+  const cacheKey=smartCoverCacheKey(raw, {year, hint, catalogYear});
+  const isRejected=coverRejectChecker(smartCoverCacheKey(raw));
   if(useCache){
     const cached=getSmartCoverCache(cacheKey);
-    if(cached) return cached.posterUrl ? cached : null;
+    if(cached && !(cached.posterUrl && isRejected(cached.posterUrl))) return cached.posterUrl ? publicCover(cached) : null;
   }
-  const settings=getCoverSettings();
-  const providers=[
-    ()=>lookupItunes(cleaned, year, settings),
-    ()=>lookupWikipediaPageImage(cleaned, year),
-    ()=>lookupWikidata(cleaned, year)
-  ];
-  for(const provider of providers){
-    try{
-      const result=await provider();
-      if(result?.posterUrl){
-        if(useCache) setSmartCoverCache(cacheKey, result, COVER_SUCCESS_CACHE_DAYS);
-        return result;
-      }
-    }catch(_){/* next provider */}
+  const flightKey=cacheKey+(validateImage?'':'|nv');
+  if(coverInflight.has(flightKey)) return coverInflight.get(flightKey);
+  const variants=buildTitleVariants(cleaned.title, year, true);
+  const ctx={cleaned, year, catalogYear, hint, isRejected, validate:validateImage, settings:getCoverSettings(), variants, wanted:new Set(variants.map(simpleText))};
+  const task=resolveAutoCover(ctx).then(result=>{
+    // Only an answer ("found" or a genuine "no match") is cached. Errors throw and skip this line.
+    if(useCache) setSmartCoverCache(cacheKey, result, result ? COVER_SUCCESS_CACHE_DAYS : COVER_FAIL_CACHE_DAYS);
+    return result ? publicCover(result) : null;
+  }).finally(()=>coverInflight.delete(flightKey));
+  coverInflight.set(flightKey, task);
+  return task;
+}
+function publicCover(r){return {posterUrl:r.posterUrl, provider:r.provider || '', title:r.title || '', year:r.year || '', confidence:Number(r.confidence) || 0, pageUrl:r.pageUrl || ''};}
+/* Kept for older callers: same as findAutoCover({title, section, format}). */
+function lookupSmartCover(rawTitle, options={}, useCache=true){
+  return findAutoCover({title:rawTitle, section:options.section, format:options.format, catalog:options.catalog}, {useCache});
+}
+async function resolveAutoCover(ctx){
+  let failed=false;
+  const attempt=async fn=>{try{return await fn();}catch(e){if(e?.kind==='ratelimit') throw e; if(e?.kind!=='auth') failed=true; return undefined;}};
+  const wiki=await attempt(()=>wikipediaIdentity(ctx));
+  if(wiki===undefined) throw coverError('network', 'Wikipedia unavailable: cannot rule out other films with this title');
+  if(wiki.status==='ambiguous') return null;
+  const film=wiki.status==='unique' ? wiki.film : null;
+  const sources=[];
+  if(ctx.settings.tmdbKey && !tmdbRejected) sources.push(()=>tmdbExactFilms(ctx));
+  sources.push(()=>itunesExactFilms(ctx));
+  const options=[];   // poster candidates for the decided film, best first
+  for(const source of sources){
+    const films=await attempt(source);
+    if(!films?.length) continue;
+    const pick=pickFilm(films, ctx, film);
+    if(pick===AUTO_AMBIGUOUS) return null;
+    if(pick){options.push(pick); break;}
   }
-  if(useCache) setSmartCoverCache(cacheKey, {posterUrl:'', reason:'No strong cover match', fetchedAt:new Date().toISOString()}, COVER_FAIL_CACHE_DAYS);
+  if(film){
+    if(film.posterUrl && !ctx.isRejected(film.posterUrl)) options.push(wikipediaCover(film, film.posterUrl, 'Wikipedia Infobox/PageImages'));
+    else if(!film.posterUrl && !options.length){   // last resort: read the infobox of that ONE page for its poster file
+      const image=await attempt(()=>getWikipediaInfoboxPosterUrl(film.page));
+      if(image && !ctx.isRejected(image.url)) options.push(wikipediaCover(film, image.url, 'Wikipedia Infobox'));
+    }
+  }
+  for(const option of options){
+    if(!ctx.validate || await preloadCover(option)) return option;
+    failed=true;   // the image does not load: never store it, and do not call this a genuine "no match"
+  }
+  if(failed) throw coverError('network', 'Cover providers unavailable');
   return null;
 }
+function wikipediaCover(film, url, provider){
+  return normalizeResult({provider, confidence:film.year ? .92 : .88, title:film.title, year:film.year, posterUrl:url, pageUrl:film.pageUrl});
+}
+/* Choose the exact-title film a TMDB/iTunes result list stands for. `film` = identity already fixed by Wikipedia (or null). */
+function pickFilm(films, ctx, film){
+  const want=film?.year || ctx.year;
+  let pool=films;
+  if(want) pool=films.filter(f=>yearsClose(f.year, want));
+  else{
+    const significant=films.filter(f=>f.significant!==false);
+    if(yearClusters((significant.length ? significant : films).map(f=>f.year))>1){   // several films share the title, nothing says which
+      pool=ctx.catalogYear ? films.filter(f=>yearsClose(f.year, ctx.catalogYear)) : [];
+      if(!pool.length) return AUTO_AMBIGUOUS;
+    }
+  }
+  return pool.find(f=>f.posterUrl && !ctx.isRejected(f.posterUrl)) || null;
+}
+function yearsClose(a, b){const x=Number(a), y=Number(b); return !!x && !!y && Math.abs(x-y)<=1;}
+function yearClusters(list){
+  const years=[...new Set(list.map(Number).filter(Boolean))].sort((a,b)=>a-b);
+  let clusters=0, prev=-9;
+  for(const y of years){if(y-prev>1) clusters++; prev=y;}
+  return clusters;
+}
+function preloadImage(url, timeoutMs=10000){
+  return new Promise(resolve=>{
+    const img=new Image();
+    const timer=setTimeout(()=>{img.onload=img.onerror=null; resolve(false);}, timeoutMs);
+    img.onload=()=>{clearTimeout(timer); resolve(img.naturalWidth>0 && img.naturalHeight>0);};
+    img.onerror=()=>{clearTimeout(timer); resolve(false);};
+    img.src=url;
+  });
+}
+async function preloadCover(c){
+  for(const url of [c.posterUrl, c.altUrl]){
+    if(url && await preloadImage(url)){c.posterUrl=url; return true;}
+  }
+  return false;
+}
+
+/* ---------- Auto: exact-title films per provider ---------- */
+async function itunesExactFilms(ctx){
+  for(const variant of ctx.variants.slice(0,3)){
+    const data=await itunesSearch(variant, ctx.settings, 35);
+    const films=(data.results || [])
+      .filter(item=>item.artworkUrl100 && item.trackName && (!item.kind || item.kind==='feature-movie') && ctx.wanted.has(simpleText(item.trackName)))
+      .map(item=>({provider:'iTunes', confidence:.86, title:item.trackName, year:item.releaseDate ? String(item.releaseDate).slice(0,4) : '', posterUrl:upgradeArtworkUrl(item.artworkUrl100), altUrl:upgradeArtworkUrl(item.artworkUrl100,'600x900'), pageUrl:item.trackViewUrl || item.collectionViewUrl || ''}));
+    if(films.length) return films;
+  }
+  return [];
+}
+async function tmdbExactFilms(ctx){
+  for(const variant of ctx.variants.slice(0,3)){
+    const results=await tmdbSearch(variant, ctx.year, ctx.settings.tmdbKey);
+    const films=results
+      .filter(r=>ctx.wanted.has(simpleText(r.title)) || ctx.wanted.has(simpleText(r.original_title)))
+      .map(r=>({provider:'TMDB', confidence:.9, title:r.title || r.original_title || '', year:r.release_date ? String(r.release_date).slice(0,4) : '', posterUrl:r.poster_path ? 'https://image.tmdb.org/t/p/w500'+r.poster_path : '', pageUrl:'https://www.themoviedb.org/movie/'+r.id, significant:(r.vote_count || 0)>=30}));   // TMDB lists every obscure film: only notable ones make a title "ambiguous"
+    if(films.length) return films;
+  }
+  return [];
+}
+
+/* ---------- Wikipedia: which film is it, and do other films share the title? ---------- */
+// pilicense=any: film posters are non-free images, which PageImages hides by default. 500 px is a standard Wikimedia thumbnail width.
+// `description` is the article's short description ("1995 American crime film directed by Michael Mann").
+const WIKI_PAGE_PROPS = {prop:'pageimages|description|extracts|pageprops', piprop:'thumbnail|name', pilicense:'any', pithumbsize:'500', pilimit:'max', exintro:'1', explaintext:'1', exchars:'300', exlimit:'max', ppprop:'disambiguation'};
+const WIKI_NON_FILM = /\b(series|franchise|soundtrack|album|novel|book|game|song|band|character|comics?|play)\b/i;
+async function wikiQuery(params){
+  const url=new URL('https://en.wikipedia.org/w/api.php');
+  for(const [k,v] of Object.entries({action:'query', format:'json', formatversion:'2', origin:'*', ...params})) url.searchParams.set(k, v);
+  return fetchJson(url.toString());
+}
+function isDisambiguation(page){return !!(page?.pageprops && 'disambiguation' in page.pageprops);}
+/* null unless the page is a film article whose title (minus "(… film)", "The"/"A") is one of the wanted titles. */
+function wikiFilmInfo(page, wanted){
+  const title=page.title || '';
+  if(!wanted.has(simpleText(stripArticleQualifier(title)))) return null;
+  const description=page.description || '';
+  const extract=String(page.extract || '').slice(0,300);
+  const qualifier=(title.match(/\(([^)]*)\)\s*$/) || [])[1] || '';
+  if(qualifier && !/\b(film|movie)\b/i.test(qualifier)) return null;   // "Heat (band)", "Drive (TV series)"
+  const isFilm=description ? (/\b(film|movie)\b/i.test(description) && !WIKI_NON_FILM.test(description)) : (/\b(film|movie)\b/i.test(qualifier) || /\b(film|movie)\b/i.test(extract));
+  if(!isFilm) return null;
+  return {fullTitle:title, title:stripArticleQualifier(title), year:extractYearFromText(description) || extractYearFromText(qualifier) || extractYearFromText(extract), description:description || extract, posterUrl:page.thumbnail?.source || page.original?.source || '', pageUrl:'https://en.wikipedia.org/wiki/'+encodeURIComponent(title.replace(/ /g,'_')), page};
+}
+const TITLE_SMALL_WORDS = new Set(['a','an','the','and','but','or','nor','for','of','in','on','at','to','by','as','vs','with','from','into']);
+/* "SNOW WHITE AND THE SEVEN DWARFS" -> "Snow White and the Seven Dwarfs": article titles are case-sensitive after the first letter. */
+function wikiTitleCase(text){
+  const words=String(text).split(' ');
+  return words.map((w,i)=>{
+    if(/^(ii|iii|iv|vi|vii|viii|ix|xi|xii)$/i.test(w)) return w.toUpperCase();
+    const lower=w.toLowerCase();
+    if(i>0 && i<words.length-1 && TITLE_SMALL_WORDS.has(lower)) return lower;
+    return lower.replace(/(^|[-–/(])([a-z])/g, (m,p,c)=>p+c.toUpperCase());
+  }).join(' ');
+}
+function wikiProbeTitles(ctx){
+  const out=[], seen=new Set();
+  const add=(title, qualified)=>{title=title.replace(/[|#<>\[\]{}]/g,' ').replace(/\s+/g,' ').trim(); if(title && !seen.has(title)){seen.add(title); out.push({title, qualified});}};   // characters not allowed in page titles (and "|" separates the batch)
+  const years=[ctx.year, ctx.catalogYear].filter(Boolean);
+  for(const variant of ctx.variants.slice(0,3)){
+    const bare=variant.replace(/^(?:the|a|an)\s+/i,'');
+    for(const form of new Set([variant, bare, /^(?:the|a|an)\s/i.test(variant) ? variant : 'The '+variant])){
+      for(const f of new Set(form===form.toUpperCase() ? [wikiTitleCase(form)] : [form, wikiTitleCase(form)])){
+        years.forEach(y=>add(`${f} (${y} film)`, true));
+        add(`${f} (film)`, true);
+        add(f, false);
+      }
+    }
+  }
+  return out;
+}
+/* -> {status:'unique', film} | {status:'ambiguous'} | {status:'none'} */
+async function wikipediaIdentity(ctx){
+  const probes=wikiProbeTitles(ctx);
+  const pages=[], redirects=new Map();
+  for(let i=0;i<probes.length;i+=20){
+    const data=await wikiQuery({...WIKI_PAGE_PROPS, titles:probes.slice(i,i+20).map(p=>p.title).join('|'), redirects:'1'});
+    pagesFromWikiResponse(data).filter(p=>!p.missing).forEach(p=>pages.push(p));
+    for(const r of [...(data.query?.normalized || []), ...(data.query?.redirects || [])]) redirects.set(r.from, r.to);
+  }
+  const byTitle=new Map(pages.map(p=>[p.title, p]));
+  const resolve=t=>{for(let n=0;n<5 && redirects.has(t);n++) t=redirects.get(t); return byTitle.get(t);};
+  const films=new Map();
+  let filmFormDab=false, anyDab=false;   // filmFormDab: "X (film)" / "X (1999 film)" is a disambiguation page = several films share the title
+  const takeFilm=p=>{const info=wikiFilmInfo(p, ctx.wanted); if(info && !films.has(info.fullTitle)) films.set(info.fullTitle, info);};
+  for(const probe of probes){
+    const page=resolve(probe.title);
+    if(!page) continue;
+    if(isDisambiguation(page)){
+      if(ctx.wanted.has(simpleText(stripArticleQualifier(page.title)))){anyDab=true; if(probe.qualified) filmFormDab=true;}
+    }else takeFilm(page);
+  }
+  const verdict=()=>wikiVerdict([...films.values()], ctx, filmFormDab, anyDab);
+  let result=verdict();
+  // Probes cannot see homonyms hiding under year-qualified titles ("Heat (1986 film)"): ask the case-insensitive search as well,
+  // unless an explicit year already pinned the film, or the "(film)" page is a disambiguation page and nothing can resolve it.
+  const settled=(ctx.year && result.status==='unique') || (result.status==='ambiguous' && filmFormDab && !ctx.catalogYear && !ctx.hint);
+  if(!settled){
+    for(const variant of ctx.variants.slice(0,2)){
+      const data=await wikiQuery({...WIKI_PAGE_PROPS, generator:'search', gsrsearch:`"${variant}" film`, gsrlimit:'20', gsrnamespace:'0'});
+      pagesFromWikiResponse(data).filter(p=>!p.missing && !isDisambiguation(p)).forEach(takeFilm);
+    }
+    result=verdict();
+  }
+  return result;
+}
+function wikiVerdict(list, ctx, filmFormDab, anyDab){
+  if(ctx.year){   // the title itself names the year: that film or nothing
+    const match=list.filter(f=>f.year===ctx.year);
+    if(match.length===1) return {status:'unique', film:match[0]};
+    return {status: match.length>1 || list.length || anyDab ? 'ambiguous' : 'none'};
+  }
+  if(!list.length) return {status: anyDab ? 'ambiguous' : 'none'};
+  if(list.length===1 && !filmFormDab) return {status:'unique', film:list[0]};
+  // Several films share the title. Only a catalog year or a section hint may choose between them.
+  if(ctx.catalogYear){const m=list.filter(f=>f.year===ctx.catalogYear); if(m.length===1) return {status:'unique', film:m[0]};}
+  if(ctx.hint){const m=list.filter(f=>SECTION_HINT_WORDS[ctx.hint].test(f.description)); if(m.length===1) return {status:'unique', film:m[0]};}
+  return {status:'ambiguous'};
+}
+
+/* ---------- Manual picker candidates (permissive: the user decides) ---------- */
 async function gatherPosterCandidates(searchTerm, options={}){
   const cleaned=normalizeTitle(searchTerm || options.originalTitle || '');
   const year=options.year || cleaned.year || inferYearFromTitle(cleaned.title);
   const settings=getCoverSettings();
+  const warn=options.warn || (()=>{});
+  const isRejected=coverRejectChecker(smartCoverCacheKey(options.originalTitle || searchTerm || ''));
+  const jobs=[];
+  if(settings.tmdbKey && !tmdbRejected) jobs.push(['TMDB', ()=>gatherTmdbCandidateList(cleaned, year, settings)]);
+  jobs.push(
+    ['iTunes', ()=>gatherItunesCandidateList(cleaned, year, settings)],
+    ['Wikipedia', ()=>lookupWikipediaPageImage(cleaned, year)],
+    ['Wikipedia search', ()=>looseWikipediaCandidates(cleaned.title)],
+    ['Wikidata', ()=>lookupWikidata(cleaned, year)]
+  );
+  const results=await Promise.all(jobs.map(([name, run])=>run().catch(e=>{warn(name, e); return null;})));
   const all=[];
   const seen=new Set();
-  const push=(r, fallbackScore=0)=>{
-    if(!r) return;
-    const url=r.posterUrl || r.url;
+  const push=r=>{
+    const url=r?.posterUrl || r?.url;
     if(!url) return;
-    const key=url.replace(/^https?:/,'').replace(/\d+x\d+(bb|sr)?/gi,'X');
+    const key=coverUrlKey(url);
     if(seen.has(key)) return;
     seen.add(key);
     all.push({
@@ -252,51 +720,130 @@ async function gatherPosterCandidates(searchTerm, options={}){
       source:r.provider || r.source || 'Cover',
       label:r.title || r.label || '',
       year:r.year || '',
-      score:Math.round((r.confidence || 0) * 100) || r.score || fallbackScore,
-      kind:r.raw?.matchedMethod || r.kind || ''
+      score:Math.round((r.confidence || 0) * 100),
+      rejected:isRejected(url)
     });
   };
-  try{ push(await lookupItunes(cleaned, year, settings), 86); }catch(_){ }
-  try{ push(await lookupWikipediaPageImage(cleaned, year), 82); }catch(_){ }
-  try{ push(await lookupWikidata(cleaned, year), 60); }catch(_){ }
-  try{
-    const extra=await gatherItunesCandidateList(cleaned, year, settings, options);
-    extra.forEach(c=>push(c));
-  }catch(_){ }
-  all.sort((a,b)=>b.score-a.score);
+  results.forEach(r=>[].concat(r || []).forEach(push));
+  all.sort((a,b)=>(a.rejected-b.rejected) || ((b.source==='TMDB')-(a.source==='TMDB')) || (b.score-a.score));
   return all.slice(0,30);
 }
-async function gatherItunesCandidateList(cleaned, year, settings, options={}){
-  const variants=buildTitleVariants(cleaned.title, year).slice(0,4);
+
+/* ---------- iTunes ---------- */
+async function itunesSearch(term, settings, limit=35){
+  const url=new URL('https://itunes.apple.com/search');
+  url.searchParams.set('term', term);
+  url.searchParams.set('media','movie');
+  url.searchParams.set('entity','movie');
+  url.searchParams.set('country', settings.itunesCountry || 'US');
+  url.searchParams.set('limit', String(limit));
+  if(!itunesUseJsonp){
+    try{return await fetchJson(url.toString());}
+    catch(e){if(!(e instanceof TypeError)) throw e;}   // TypeError = network/CORS failure: retry as JSONP
+  }
+  const data=await jsonpFetch(url.toString());
+  itunesUseJsonp=true;   // CORS is blocked here, so skip the doomed fetch() from now on (it would double the request count)
+  return data;
+}
+/* JSONP for APIs that support &callback=. Always removes the script tag and the global callback. */
+function jsonpFetch(url, timeoutMs=8500){
+  return new Promise((resolve, reject)=>{
+    const name='__mvJsonp'+Date.now().toString(36)+Math.random().toString(36).slice(2,7);
+    const target=new URL(url);
+    target.searchParams.set('callback', name);
+    const script=document.createElement('script');
+    let timer=0, done=false;
+    const finish=(ok, value)=>{
+      if(done) return;
+      done=true;
+      clearTimeout(timer);
+      script.onerror=null;
+      script.remove();
+      delete window[name];   // success, error and timeout all clean up (a response arriving after a timeout is simply ignored)
+      if(ok) resolve(value); else reject(value);
+    };
+    window[name]=data=>finish(true, data);
+    script.onerror=()=>finish(false, coverError('network', 'JSONP request failed'));
+    timer=setTimeout(()=>finish(false, coverError('timeout', 'JSONP request timed out')), timeoutMs);
+    script.src=target.toString();
+    document.head.appendChild(script);
+  });
+}
+function scoreItunesItems(items, cleaned, variant, year){
+  return (items || []).filter(item=>item.artworkUrl100).map(item=>{
+    const itemYear=item.releaseDate ? String(item.releaseDate).slice(0,4) : '';
+    const titleScore=Math.max(coverTitleScore(cleaned, variant, item.trackName), coverTitleScore(cleaned, variant, item.collectionName));
+    const yearScore=year && itemYear===year ? .14 : year && itemYear!==year ? -.07 : 0;
+    const movieBonus=item.wrapperType==='track' && item.kind==='feature-movie' ? .04 : 0;
+    return normalizeResult({provider:'iTunes', confidence:Math.min(.86, titleScore + yearScore + movieBonus), title:item.trackName || item.collectionName || '', year:itemYear, posterUrl:upgradeArtworkUrl(item.artworkUrl100), pageUrl:item.trackViewUrl || item.collectionViewUrl || ''});
+  });
+}
+/* Fuzzy similarity of a candidate name to the cleaned title or to the query variant (picker only). */
+function coverTitleScore(cleaned, variant, name){
+  return name ? Math.max(similarity(cleaned.title, name), similarity(variant, name)) : 0;
+}
+async function gatherItunesCandidateList(cleaned, year, settings){
+  const variants=buildTitleVariants(cleaned.title, year);
   const out=[];
-  for(const variant of variants){
-    const url=new URL('https://itunes.apple.com/search');
-    url.searchParams.set('term', variant);
-    url.searchParams.set('media','movie');
-    url.searchParams.set('entity','movie');
-    url.searchParams.set('country', settings.itunesCountry || 'US');
-    url.searchParams.set('limit','18');
+  for(const variant of variants.slice(0,4)){
     try{
-      const data=await fetchJson(url.toString(), {}, 8500);
-      for(const item of (data.results || []).filter(x=>x.artworkUrl100)){
-        const itemYear=item.releaseDate ? String(item.releaseDate).slice(0,4) : '';
-        const titleScore=Math.max(
-          similarity(cleaned.title, item.trackName || ''),
-          similarity(variant, item.trackName || ''),
-          similarity(cleaned.title, item.collectionName || ''),
-          similarity(variant, item.collectionName || '')
-        );
-        const yearScore=year && itemYear===year ? .14 : year && itemYear!==year ? -.07 : 0;
-        const movieBonus=item.wrapperType==='track' && item.kind==='feature-movie' ? .04 : 0;
-        const confidence=Math.min(.86, titleScore + yearScore + movieBonus);
-        if(confidence>=.36){
-          out.push({provider:'iTunes', confidence, title:item.trackName || item.collectionName || '', year:itemYear, posterUrl:upgradeArtworkUrl(item.artworkUrl100), raw:item});
-        }
-      }
-    }catch(_){ }
+      const data=await itunesSearch(variant, settings, 18);
+      out.push(...scoreItunesItems(data.results, cleaned, variant, year).filter(c=>c.confidence>=.36));
+    }catch(e){
+      if(e?.kind==='ratelimit' || !out.length) throw e;   // keep what the earlier variants found
+    }
   }
   return out.sort((a,b)=>b.confidence-a.confidence).slice(0,24);
 }
+function upgradeArtworkUrl(url, size='1200x1800'){
+  if(!url) return url;
+  return String(url)
+    .replace(/\d+x\d+(bb|sr)?\.(jpg|png|jpeg)$/i,`${size}bb.$2`)
+    .replace(/\/\d+x\d+bb\./,`/${size}bb.`)
+    .replace(/\/\d+x\d+bb\//,`/${size}bb/`)
+    .replace('100x100bb',`${size}bb`)
+    .replace('100x100',size);
+}
+
+/* ---------- TMDB (optional; used first when an API key is set) ---------- */
+async function tmdbRequest(path, params, key){
+  const url=new URL('https://api.themoviedb.org/3'+path);
+  for(const [k,v] of Object.entries(params || {})) if(v) url.searchParams.set(k, v);
+  const options={};
+  if(key.startsWith('eyJ')) options.headers={Authorization:'Bearer '+key};   // v4 read-access token (a JWT)
+  else url.searchParams.set('api_key', key);                                  // v3 API key
+  try{return await fetchJson(url.toString(), options);}
+  catch(e){
+    if(e?.status===401){
+      if(!tmdbRejected) coverNotify('TMDB rejected the API key. Check it in Cover settings.');
+      tmdbRejected=true;
+      throw coverError('auth', 'TMDB key rejected', 401);
+    }
+    throw e;
+  }
+}
+/* /search/movie for one title (plus the year when known; without it again if that finds nothing). */
+async function tmdbSearch(query, year, key){
+  let data=await tmdbRequest('/search/movie', {query, year, include_adult:'false'}, key);
+  if(year && !(data.results || []).length) data=await tmdbRequest('/search/movie', {query, include_adult:'false'}, key);
+  return data.results || [];
+}
+async function gatherTmdbCandidateList(cleaned, year, settings){
+  const variants=buildTitleVariants(cleaned.title, year);
+  const out=[];
+  for(const variant of variants.slice(0,3)){
+    for(const r of await tmdbSearch(variant, year, settings.tmdbKey)){
+      if(!r.poster_path) continue;
+      const itemYear=r.release_date ? String(r.release_date).slice(0,4) : '';
+      const yearScore=year && itemYear===year ? .14 : year && itemYear!==year ? -.07 : 0;
+      const confidence=Math.min(.9, Math.max(coverTitleScore(cleaned, variant, r.title), coverTitleScore(cleaned, variant, r.original_title)) + yearScore);
+      if(confidence>=.36) out.push(normalizeResult({provider:'TMDB', confidence, title:r.title || r.original_title || '', year:itemYear, posterUrl:'https://image.tmdb.org/t/p/w500'+r.poster_path, pageUrl:'https://www.themoviedb.org/movie/'+r.id}));
+    }
+  }
+  return out.sort((a,b)=>b.confidence-a.confidence).slice(0,10);
+}
+
+/* ---------- Title cleaning / variants / similarity ---------- */
 function normalizeTitle(rawTitle){
   let title=String(rawTitle || '').trim();
   const original=title;
@@ -311,6 +858,7 @@ function normalizeTitle(rawTitle){
   });
   let year='';
   title=title.replace(/\b((?:18|19|20)\d{2})\b\s*$/i,(full,y)=>{year=y; removed.push(`year:${y}`); return ' ';}).trim();
+  if(!title && year){year=''; removed.pop();}   // the whole title is a number ("1917"): it is the title, not a release year
   title=title.replace(/\s+\d{3,7}$/g,(full)=>{
     if(/^\d+$/.test(title.trim())) return full;
     removed.push(`catalog-id:${full.trim()}`);
@@ -326,6 +874,11 @@ function normalizeTitle(rawTitle){
   for(const pattern of editionPatterns){
     title=title.replace(pattern,(match)=>{removed.push(match.trim()); return ' ';});
   }
+  title=title.replace(/\s+/g,' ').trim();
+  // Collection shorthand: "HEAT SE", "GHOST SE 8", "CASABLANCA LD", and a lone trailing A/B marking a second copy ("TOP GUN A").
+  // A trailing A/B is only a marker when a real title (2+ words) remains: "PROJECT A" is a title.
+  title=title.replace(/\s+(?:SE|LD|CE)(?:\s*\d+)?$/i,match=>{removed.push(match.trim()); return '';}).trim();
+  title=title.replace(/\s+[AB]$/i,match=>{if(title.split(' ').length<3) return match; removed.push(match.trim()); return '';}).trim();
   title=title.replace(/\s+[:\-–—]\s*$/g,'').replace(/\s+/g,' ').trim();
   return {original, title:title || original, year, removed:[...new Set(removed.filter(Boolean))], cacheKey:`${(title || original).toLowerCase()}|${year || ''}`};
 }
@@ -333,135 +886,78 @@ function cleanMovieTitle(t){return normalizeTitle(t).title;}
 function looksLikeEditionOrFormat(text){
   return /\b(4k|uhd|dvd|blu[\s-]?ray|steel\s*book|steelbook|3d|criterion|remaster|collector|special|limited|extended|director|theatrical|region|disc|signature|diamond|digibook|mediabook)\b/i.test(text);
 }
+/* JSON GET with a timeout. Throws errors tagged `kind`: 'ratelimit' (HTTP 429; also pauses the auto queue), 'http', 'timeout',
+   or the original TypeError (kind 'network') when the request could not be made at all (offline, blocked, CORS). */
 async function fetchJson(url, options={}, timeoutMs=8500){
   const controller=new AbortController();
   const timeout=setTimeout(()=>controller.abort(), timeoutMs);
   const signal=options.signal || controller.signal;
   try{
     const response=await fetch(url, {...options, signal});
-    if(!response.ok) throw new Error(`HTTP ${response.status}`);
-    return await response.json();
+    if(response.status===429){noteCoverRateLimit(); throw coverError('ratelimit', 'HTTP 429', 429);}
+    if(!response.ok) throw coverError('http', `HTTP ${response.status}`, response.status);
+    let data;
+    try{data=await response.json();}catch(_){throw coverError('http', 'Invalid JSON');}
+    if(data?.error?.code){   // MediaWiki reports some failures as HTTP 200 with an error object
+      const limited=/ratelimit/i.test(data.error.code);
+      if(limited) noteCoverRateLimit();
+      throw coverError(limited ? 'ratelimit' : 'http', data.error.info || data.error.code);
+    }
+    return data;
+  }catch(e){
+    if(e?.name==='AbortError') throw coverError('timeout', 'Request timed out');
+    if(e instanceof TypeError && !e.kind) e.kind='network';
+    throw e;
   }finally{clearTimeout(timeout);}
 }
-async function lookupItunes(cleaned, year, settings){
-  const variants=buildTitleVariants(cleaned.title, year);
-  for(const variant of variants){
-    const url=new URL('https://itunes.apple.com/search');
-    url.searchParams.set('term', variant);
-    url.searchParams.set('media','movie');
-    url.searchParams.set('entity','movie');
-    url.searchParams.set('country', settings.itunesCountry || 'US');
-    url.searchParams.set('limit','35');
-    const data=await fetchJson(url.toString());
-    const candidates=(data.results || []).filter(item=>item.artworkUrl100);
-    if(!candidates.length) continue;
-    const scored=candidates.map(item=>{
-      const itemYear=item.releaseDate ? String(item.releaseDate).slice(0,4) : '';
-      const titleScore=Math.max(
-        similarity(cleaned.title, item.trackName || ''),
-        similarity(variant, item.trackName || ''),
-        similarity(cleaned.title, item.collectionName || ''),
-        similarity(variant, item.collectionName || '')
-      );
-      const yearScore=year && itemYear===year ? .14 : year && itemYear!==year ? -.07 : 0;
-      const movieBonus=item.wrapperType==='track' && item.kind==='feature-movie' ? .04 : 0;
-      return {item, score:titleScore + yearScore + movieBonus, year:itemYear};
-    }).sort((a,b)=>b.score-a.score);
-    const best=scored[0];
-    if(best.score < .42) continue;
-    return normalizeResult({provider:'iTunes', confidence:Math.min(.86,best.score), title:best.item.trackName || best.item.collectionName, year:best.year, posterUrl:upgradeArtworkUrl(best.item.artworkUrl100), pageUrl:best.item.trackViewUrl || best.item.collectionViewUrl || '', raw:{matchedAlias:variant, ...best.item}});
-  }
-  return null;
-}
-function upgradeArtworkUrl(url){
-  if(!url) return url;
-  return String(url)
-    .replace(/\d+x\d+(bb|sr)?\.(jpg|png|jpeg)$/i,'1200x1800bb.$2')
-    .replace(/\/\d+x\d+bb\./,'/1200x1800bb.')
-    .replace(/\/\d+x\d+bb\//,'/1200x1800bb/')
-    .replace('100x100bb','1200x1800bb')
-    .replace('100x100','1200x1800');
-}
+
+/* ---------- Wikipedia (picker) ---------- */
+/* Best exact-title film article with a poster. Reads the wikitext of ONE page only as a last resort (accepted page, no page image). */
 async function lookupWikipediaPageImage(cleaned, year){
   const variants=buildTitleVariants(cleaned.title, year);
   const lookupYear=year || inferYearFromTitle(cleaned.title);
   const directTitles=buildWikipediaTitleCandidates(variants, lookupYear);
-  for(let i=0;i<directTitles.length;i+=40){
-    const chunk=directTitles.slice(i,i+40);
-    const directUrl=new URL('https://en.wikipedia.org/w/api.php');
-    directUrl.searchParams.set('action','query');
-    directUrl.searchParams.set('titles', chunk.join('|'));
-    directUrl.searchParams.set('redirects','1');
-    directUrl.searchParams.set('prop','pageimages|extracts|info|revisions');
-    directUrl.searchParams.set('piprop','thumbnail|name|original');
-    directUrl.searchParams.set('pithumbsize','900');
-    directUrl.searchParams.set('exintro','1');
-    directUrl.searchParams.set('explaintext','1');
-    directUrl.searchParams.set('inprop','url');
-    directUrl.searchParams.set('rvprop','content');
-    directUrl.searchParams.set('rvslots','main');
-    directUrl.searchParams.set('format','json');
-    directUrl.searchParams.set('formatversion','2');
-    directUrl.searchParams.set('origin','*');
-    const data=await fetchJson(directUrl.toString());
+  let noImage=null;   // first accepted page without a page image: only used as a last resort
+  const consider=(candidates, cap)=>{
+    for(const candidate of candidates){
+      const image=candidate.page.thumbnail?.source || candidate.page.original?.source;
+      if(!image){noImage=noImage || candidate; continue;}
+      return wikipediaResult(candidate, image, 'Wikipedia Infobox/PageImages', cap, lookupYear);
+    }
+    return null;
+  };
+  for(let i=0;i<directTitles.length;i+=20){
+    const data=await wikiQuery({...WIKI_PAGE_PROPS, titles:directTitles.slice(i,i+20).join('|'), redirects:'1'});
     const pages=pagesFromWikiResponse(data).filter(page=>!page.missing);
-    const candidates=pages.map(page=>scoreWikipediaPage(page, variants, cleaned.title, lookupYear, true)).filter(c=>c.accepted).sort((a,b)=>b.score-a.score);
-    for(const candidate of candidates){
-      const image=candidate.page.original?.source || candidate.page.thumbnail?.source || await getWikipediaInfoboxPosterUrl(candidate.page);
-      if(!image) continue;
-      return normalizeResult({provider:image.sourceProvider || 'Wikipedia Infobox/PageImages', confidence:Math.min(.94,candidate.score), title:stripArticleQualifier(candidate.page.title), year:candidate.year || lookupYear || '', posterUrl:image.url || image, pageUrl:candidate.page.fullurl || `https://en.wikipedia.org/?curid=${candidate.page.pageid}`, raw:{matchedMethod:image.sourceProvider==='Wikipedia Infobox'?'exact-page-infobox':'exact-page-pageimage', pageid:candidate.page.pageid, pageTitle:candidate.page.title, imageName:image.fileName || candidate.page.pageimage || '', extract:(candidate.page.extract || '').slice(0,450)}});
-    }
+    const found=consider(pages.map(page=>scoreWikipediaPage(page, variants, cleaned.title, lookupYear, true)).filter(c=>c.accepted).sort((a,b)=>b.score-a.score), .94);
+    if(found) return found;
   }
-  for(const variant of variants){
-    const searchUrl=new URL('https://en.wikipedia.org/w/api.php');
-    searchUrl.searchParams.set('action','query');
-    searchUrl.searchParams.set('generator','search');
-    searchUrl.searchParams.set('gsrsearch', lookupYear ? `${variant} ${lookupYear} film` : `${variant} film`);
-    searchUrl.searchParams.set('gsrlimit','8');
-    searchUrl.searchParams.set('prop','pageimages|extracts|info|revisions');
-    searchUrl.searchParams.set('piprop','thumbnail|name|original');
-    searchUrl.searchParams.set('pithumbsize','900');
-    searchUrl.searchParams.set('exintro','1');
-    searchUrl.searchParams.set('explaintext','1');
-    searchUrl.searchParams.set('inprop','url');
-    searchUrl.searchParams.set('rvprop','content');
-    searchUrl.searchParams.set('rvslots','main');
-    searchUrl.searchParams.set('format','json');
-    searchUrl.searchParams.set('formatversion','2');
-    searchUrl.searchParams.set('origin','*');
-    const data=await fetchJson(searchUrl.toString());
-    const pages=pagesFromWikiResponse(data);
-    const candidates=pages.map(page=>scoreWikipediaPage(page, variants, cleaned.title, lookupYear, false)).filter(c=>c.accepted).sort((a,b)=>b.score-a.score);
-    for(const candidate of candidates){
-      const image=candidate.page.original?.source || candidate.page.thumbnail?.source || await getWikipediaInfoboxPosterUrl(candidate.page);
-      if(!image) continue;
-      return normalizeResult({provider:image.sourceProvider || 'Wikipedia Infobox/PageImages', confidence:Math.min(.88,candidate.score), title:stripArticleQualifier(candidate.page.title), year:candidate.year || lookupYear || '', posterUrl:image.url || image, pageUrl:candidate.page.fullurl || `https://en.wikipedia.org/?curid=${candidate.page.pageid}`, raw:{matchedMethod:image.sourceProvider==='Wikipedia Infobox'?'strict-search-infobox':'strict-search-pageimage', matchedAlias:variant, pageid:candidate.page.pageid, pageTitle:candidate.page.title, imageName:image.fileName || candidate.page.pageimage || '', extract:(candidate.page.extract || '').slice(0,450)}});
-    }
+  for(const variant of variants.slice(0,4)){
+    const data=await wikiQuery({...WIKI_PAGE_PROPS, generator:'search', gsrsearch: lookupYear ? `${variant} ${lookupYear} film` : `${variant} film`, gsrlimit:'8'});
+    const found=consider(pagesFromWikiResponse(data).map(page=>scoreWikipediaPage(page, variants, cleaned.title, lookupYear, false)).filter(c=>c.accepted).sort((a,b)=>b.score-a.score), .88);
+    if(found) return found;
+  }
+  if(noImage){
+    const image=await getWikipediaInfoboxPosterUrl(noImage.page);
+    if(image) return wikipediaResult(noImage, image.url, 'Wikipedia Infobox', .88, lookupYear);
   }
   return null;
+}
+function wikipediaResult(candidate, url, provider, cap, lookupYear){
+  return normalizeResult({provider, confidence:Math.min(cap, candidate.score), title:stripArticleQualifier(candidate.page.title), year:candidate.year || lookupYear || '', posterUrl:url, pageUrl:'https://en.wikipedia.org/wiki/'+encodeURIComponent(String(candidate.page.title).replace(/ /g,'_'))});
 }
 function pagesFromWikiResponse(data){
   const pages=data.query?.pages || [];
   return Array.isArray(pages) ? pages : Object.values(pages);
 }
 async function getWikipediaInfoboxPosterUrl(page){
-  const wikiText=extractWikiText(page);
-  const fileName=extractInfoboxImageFileName(wikiText);
+  const data=await wikiQuery({titles:page.title, prop:'revisions', rvprop:'content', rvslots:'main'});
+  const fileName=extractInfoboxImageFileName(extractWikiText(pagesFromWikiResponse(data)[0] || {}));
   if(!fileName) return null;
-  const infoUrl=new URL('https://en.wikipedia.org/w/api.php');
-  infoUrl.searchParams.set('action','query');
-  infoUrl.searchParams.set('titles', `File:${fileName}`);
-  infoUrl.searchParams.set('prop','imageinfo');
-  infoUrl.searchParams.set('iiprop','url|mime|size');
-  infoUrl.searchParams.set('iiurlwidth','900');
-  infoUrl.searchParams.set('format','json');
-  infoUrl.searchParams.set('origin','*');
-  const data=await fetchJson(infoUrl.toString());
-  const filePage=pagesFromWikiResponse(data)[0];
-  const imageInfo=filePage?.imageinfo?.[0];
+  const info=await wikiQuery({titles:`File:${fileName}`, prop:'imageinfo', iiprop:'url|mime|size', iiurlwidth:'500'});
+  const imageInfo=pagesFromWikiResponse(info)[0]?.imageinfo?.[0];
   const url=imageInfo?.thumburl || imageInfo?.url;
-  if(!url) return null;
-  return {url, fileName, sourceProvider:'Wikipedia Infobox'};
+  return url ? {url, fileName} : null;
 }
 function extractWikiText(page){
   const revision=page.revisions?.[0];
@@ -499,7 +995,7 @@ function stripHtmlComments(value){
 function buildWikipediaTitleCandidates(variants, year){
   const titles=[];
   const add=value=>{
-    const cleaned=compactSpaces(value);
+    const cleaned=compactSpaces(String(value).replace(/\|/g,' '));
     if(!cleaned) return;
     if(!titles.some(existing=>simpleText(existing)===simpleText(cleaned))) titles.push(cleaned);
   };
@@ -513,20 +1009,20 @@ function buildWikipediaTitleCandidates(variants, year){
 function scoreWikipediaPage(page, variants, requestedTitle, year, exactPageMode){
   const articleTitle=page.title || '';
   const bareTitle=stripArticleQualifier(articleTitle);
-  const textBlob=`${articleTitle} ${page.extract || ''}`.toLowerCase();
+  const textBlob=`${articleTitle} ${page.description || ''} ${page.extract || ''}`.toLowerCase();
   const articleSimple=simpleText(articleTitle);
   const bareSimple=simpleText(bareTitle);
   const variantSimples=variants.map(simpleText).filter(Boolean);
   const requestedSimple=simpleText(requestedTitle);
-  const pageYear=extractYearFromText(`${articleTitle} ${page.extract || ''}`);
+  const pageYear=extractYearFromText(`${articleTitle} ${page.description || ''} ${page.extract || ''}`);
   const hasFilmSignals=textBlob.includes('film') || textBlob.includes('directed by') || textBlob.includes('starring') || textBlob.includes('screenplay') || textBlob.includes('animated');
   const hasImage=Boolean(page.thumbnail?.source || page.original?.source || page.pageimage);
   const exactBareMatch=variantSimples.includes(bareSimple) || bareSimple===requestedSimple;
   const exactQualifiedMatch=variantSimples.some(value=>articleSimple===simpleText(`${value} film`) || articleSimple===simpleText(`${value} ${year || ''} film`));
   const yearOk=!year || pageYear===String(year) || articleTitle.includes(String(year));
-  const oneWordRequest=requestedSimple.split(' ').filter(Boolean).length===1;
-  let accepted=hasFilmSignals && yearOk && (exactBareMatch || exactQualifiedMatch);
-  if(oneWordRequest && !exactBareMatch && !exactQualifiedMatch) accepted=false;
+  const qualifier=(articleTitle.match(/\(([^)]*)\)\s*$/) || [])[1] || '';
+  const qualifierOk=!qualifier || /film|movie|animated|series|tv/i.test(qualifier);   // "Heat (band)" is not the film
+  let accepted=hasFilmSignals && yearOk && qualifierOk && !isDisambiguation(page) && (exactBareMatch || exactQualifiedMatch);
   if(!exactPageMode && !exactBareMatch) accepted=false;
   let score=0;
   if(accepted){
@@ -538,6 +1034,20 @@ function scoreWikipediaPage(page, variants, requestedTitle, year, exactPageMode)
     if(hasImage) score+=.02;
   }
   return {page, accepted, score, year:pageYear};
+}
+/* Picker only: Wikipedia's fuzzy full-text search finds misremembered titles ("3 days in the condor" -> "Three Days of the Condor"). */
+async function looseWikipediaCandidates(term){
+  const queries=[...new Set([term, numberWordVariant(term)].filter(Boolean))];
+  const out=[], seenPages=new Set();
+  for(const query of queries){
+    const data=await wikiQuery({generator:'search', gsrsearch:`${query} film`, gsrlimit:'10', gsrnamespace:'0', prop:'pageimages|pageprops', piprop:'thumbnail', pilicense:'any', pithumbsize:'500', pilimit:'max', ppprop:'disambiguation'});
+    for(const p of pagesFromWikiResponse(data)){
+      if(!p.thumbnail?.source || isDisambiguation(p) || seenPages.has(p.pageid)) continue;
+      seenPages.add(p.pageid);
+      out.push({provider:'Wikipedia search', confidence:Math.min(.7, .25 + Math.max(similarity(term, stripArticleQualifier(p.title)), similarity(query, stripArticleQualifier(p.title)))*.45), title:p.title, year:extractYearFromText(p.title), posterUrl:p.thumbnail.source});
+    }
+  }
+  return out;
 }
 function inferYearFromTitle(title){
   const key=simpleText(title);
@@ -553,42 +1063,35 @@ function extractYearFromText(text){
   const match=source.match(/\b(18|19|20)\d{2}\b/);
   return match ? match[0] : '';
 }
+
+/* ---------- Wikidata (picker only) ---------- */
+// P18 ("image") is normally a photo, not a poster, so Wikidata never feeds automatic assignment. P3383 ("film poster") is preferred when present.
 async function lookupWikidata(cleaned, year){
-  const searchUrl=new URL('https://www.wikidata.org/w/api.php');
-  searchUrl.searchParams.set('action','wbsearchentities');
-  searchUrl.searchParams.set('search', cleaned.title);
-  searchUrl.searchParams.set('language','en');
-  searchUrl.searchParams.set('format','json');
-  searchUrl.searchParams.set('origin','*');
-  searchUrl.searchParams.set('limit','8');
-  const searchData=await fetchJson(searchUrl.toString());
+  const searchData=await fetchJson(wikidataUrl({action:'wbsearchentities', search:cleaned.title, language:'en', limit:'8'}));
   const ids=(searchData.search || []).map(item=>item.id).slice(0,8);
   if(!ids.length) return null;
-  const entityUrl=new URL('https://www.wikidata.org/w/api.php');
-  entityUrl.searchParams.set('action','wbgetentities');
-  entityUrl.searchParams.set('ids', ids.join('|'));
-  entityUrl.searchParams.set('props','claims|labels|descriptions');
-  entityUrl.searchParams.set('languages','en');
-  entityUrl.searchParams.set('format','json');
-  entityUrl.searchParams.set('origin','*');
-  const entityData=await fetchJson(entityUrl.toString());
-  const entities=Object.values(entityData.entities || {});
+  const entityData=await fetchJson(wikidataUrl({action:'wbgetentities', ids:ids.join('|'), props:'claims|labels|descriptions', languages:'en'}));
   const scored=[];
-  for(const entity of entities){
+  for(const entity of Object.values(entityData.entities || {})){
     const claims=entity.claims || {};
     const isFilm=(claims.P31 || []).some(claim=>claim.mainsnak?.datavalue?.value?.id==='Q11424');
-    const imageClaim=(claims.P18 || [])[0]?.mainsnak?.datavalue?.value;
+    const posterClaim=(claims.P3383 || [])[0]?.mainsnak?.datavalue?.value;
+    const imageClaim=posterClaim || (claims.P18 || [])[0]?.mainsnak?.datavalue?.value;
     const publicationYear=extractWikidataYear(claims.P577);
     const title=entity.labels?.en?.value || '';
     if(!isFilm || !imageClaim) continue;
     const titleScore=similarity(cleaned.title, title);
     const yearScore=year && publicationYear===year ? .16 : 0;
-    scored.push({entity, imageClaim, title, publicationYear, score:titleScore + yearScore});
+    scored.push(normalizeResult({provider:posterClaim ? 'Wikidata/P3383' : 'Wikidata/P18', confidence:Math.min(posterClaim ? .95 : .76, titleScore + yearScore), title, year:publicationYear, posterUrl:commonsImageUrl(imageClaim, 500), pageUrl:`https://www.wikidata.org/wiki/${entity.id}`}));
   }
-  scored.sort((a,b)=>b.score-a.score);
+  scored.sort((a,b)=>b.confidence-a.confidence);
   const best=scored[0];
-  if(!best || best.score < .42) return null;
-  return normalizeResult({provider:'Wikidata/P18', confidence:Math.min(.76,best.score), title:best.title, year:best.publicationYear, posterUrl:commonsImageUrl(best.imageClaim, 600), pageUrl:`https://www.wikidata.org/wiki/${best.entity.id}`, raw:{id:best.entity.id, image:best.imageClaim, description:best.entity.descriptions?.en?.value || ''}});
+  return best && best.confidence>=.42 ? best : null;
+}
+function wikidataUrl(params){
+  const url=new URL('https://www.wikidata.org/w/api.php');
+  for(const [k,v] of Object.entries({format:'json', origin:'*', ...params})) url.searchParams.set(k, v);
+  return url.toString();
 }
 function extractWikidataYear(claims){
   const value=(claims || [])[0]?.mainsnak?.datavalue?.value?.time;
@@ -600,9 +1103,12 @@ function commonsImageUrl(fileName, width){
   return `https://commons.wikimedia.org/wiki/Special:Redirect/file/${encodeURIComponent(normalized)}?width=${width}`;
 }
 function normalizeResult(result){
-  return {provider:result.provider, confidence:Number(result.confidence || 0), title:result.title || '', year:result.year || '', posterUrl:result.posterUrl || '', pageUrl:result.pageUrl || '', raw:result.raw || {}, fetchedAt:new Date().toISOString()};
+  return {provider:result.provider, confidence:Number(result.confidence || 0), title:result.title || '', year:result.year || '', posterUrl:result.posterUrl || '', altUrl:result.altUrl || '', pageUrl:result.pageUrl || ''};
 }
-function buildTitleVariants(title, year=''){
+
+/* ---------- Title variants ---------- */
+const NUMBER_WORDS={'1':'one','2':'two','3':'three','4':'four','5':'five','6':'six','7':'seven','8':'eight','9':'nine','10':'ten','11':'eleven','12':'twelve','13':'thirteen','14':'fourteen','15':'fifteen','16':'sixteen','17':'seventeen','18':'eighteen','19':'nineteen','20':'twenty'};
+function buildTitleVariants(title, year='', auto=false){
   const base=compactSpaces(title);
   const variants=[];
   const add=value=>{
@@ -614,18 +1120,28 @@ function buildTitleVariants(title, year=''){
   add(base.split(':').join(' '));
   add(base.split('’').join(''));
   add(base.split("'").join(''));
-  add(leetToWords(base));
+  // Digits-for-letters only inside a word that mixes letters and digits (SE7EN, S1M0NE). Never for plain numbers: 10 -> "io" matched the film "IO".
+  const mixed=w=>/[a-z]/i.test(w) && /\d/.test(w);
+  if(base.split(' ').some(mixed)) add(base.split(' ').map(w=>mixed(w) ? leetToWords(w) : w).join(' '));
+  // Standalone numbers as words ("3 Days of the Condor" -> "three Days..."). A bare number title ("10" -> "ten") only for the manual picker.
+  const words=numberWordVariant(base);
+  if(words && !(auto && /^\d+$/.test(simpleText(base).replace(/ /g,'')))) add(words);
   const known={'se7en':'Seven','wall e':'WALL-E','walle':'WALL-E','mi':'Mission: Impossible','fifth element':'The Fifth Element','wonderful life':'It’s a Wonderful Life','the mermaid':'The Little Mermaid','hunchback':'The Hunchback of Notre Dame'};
   const key=simpleText(base);
   if(known[key]) add(known[key]);
   if(year && base.includes(String(year))) add(base.split(String(year)).join(''));
   return variants.slice(0,8);
 }
+function numberWordVariant(title){
+  let changed=false;
+  const out=String(title || '').split(' ').map(w=>{if(NUMBER_WORDS[w]){changed=true; return NUMBER_WORDS[w];} return w;}).join(' ');
+  return changed ? out : '';
+}
 function compactSpaces(value){return String(value || '').split(' ').filter(Boolean).join(' ').trim();}
 function leetToWords(title){return String(title || '').split('0').join('o').split('1').join('i').split('3').join('e').split('4').join('a').split('5').join('s').split('7').join('v');}
 function normalizeSearchText(t){return simpleText(t);}
 function simpleText(value){
-  return String(value || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').replace(/\b(the|a|an)\b/g,' ').replace(/\s+/g,' ').trim();
+  return String(value || '').toLowerCase().normalize('NFD').replace(/[̀-ͯ]/g,'').replace(/&/g,' and ').replace(/[^a-z0-9]+/g,' ').replace(/\b(the|a|an)\b/g,' ').replace(/\s+/g,' ').trim();
 }
 function similarity(a,b){
   const x=simpleText(a);
@@ -656,4 +1172,80 @@ function levenshteinDistance(a,b){
     }
   }
   return dp[a.length][b.length];
+}
+
+/* ---------- Card DOM helpers (moved here from app.js) ---------- */
+function cardById(id){
+  return els.movieGrid ? els.movieGrid.querySelector(`.card[data-id="${CSS.escape(String(id))}"]`) : null;
+}
+function markCardLoading(id,on){
+  const cover=cardById(id)?.querySelector('.cover');
+  if(cover) cover.classList.toggle('loading',!!on);
+}
+function cardPosterButton(id, hasPoster){
+  const btn=document.createElement('button');
+  btn.className='miniBtn';
+  if(hasPoster){
+    btn.dataset.removePoster=id;
+    btn.textContent='Remove poster';
+    btn.addEventListener('click',e=>{e.stopPropagation(); removePoster(id);});
+  }else{
+    btn.dataset.searchposter=id;
+    btn.textContent='Find poster';
+    btn.addEventListener('click',e=>{e.stopPropagation(); quickPosterLookup(id);});
+  }
+  return btn;
+}
+function updateCardPoster(id,poster,title){
+  const card=cardById(id);
+  if(!card) return;
+  markCardLoading(id,false);
+  card.dataset.needsPoster='false';
+  const cover=card.querySelector('.cover');
+  if(cover){
+    const existing=cover.querySelector('img');
+    if(existing) existing.src=poster;
+    else cover.insertAdjacentHTML('afterbegin', `<img src="${escapeHtml(poster)}" alt="Cover for ${escapeHtml(title)}" loading="lazy">`);   // a failing load is handled by onCoverImageError
+  }
+  card.querySelectorAll('.posterRemovedPill').forEach(chip=>chip.remove());
+  const findBtn=card.querySelector('[data-searchposter]');
+  const actions=card.querySelector('.cardActions');
+  if(findBtn) findBtn.replaceWith(cardPosterButton(id,true));
+  else if(actions && !actions.querySelector('[data-remove-poster]')) actions.appendChild(cardPosterButton(id,true));
+}
+function removePoster(id, opts={}){
+  const m=state.movies.find(x=>x.id===id); if(!m) return;
+  if(!m.poster && m.posterRemoved===true){toast('Poster is already removed for this title.'); return;}
+  if(m.poster) rejectCover(m.title, m.poster);   // also drops the title's cache entry: a wrong auto match must not come back from the cache
+  m.poster='';
+  m.posterRemoved=true;
+  m.updated=today();
+  autoCoverQueued.delete(id);
+  autoCoverFailedSession.add(id);
+  save();
+  if(opts.keepModal){
+    els.editPoster.value='';
+    updateEditPreview();
+  }
+  render();
+  toast('Poster removed. Auto cover loading is disabled for this title.');
+}
+/* A saved poster that no longer loads would leave a blank gradient card (its title is hidden while a poster is set).
+   Reset the card to "needs poster" state instead, and forget the dead URL. */
+function onCoverImageError(e){
+  const img=e.target;
+  if(!img || img.tagName!=='IMG' || !img.matches('.card .cover img')) return;
+  const card=img.closest('.card'), id=card?.dataset.id;
+  const m=id && state.movies.find(x=>x.id===id);
+  if(!m || !m.poster || img.getAttribute('src')!==m.poster) return;   // ignore stale events from a src that was already replaced
+  rejectCover(m.title, m.poster);   // blacklists the dead URL and deletes this title's cache entries
+  m.poster='';                      // posterRemoved stays as it was: this is not a user decision
+  m.updated=today();
+  autoCoverQueued.delete(id);
+  autoCoverFailedSession.add(id);   // do not retry in a loop this session
+  save();
+  card.dataset.needsPoster='true';
+  card.querySelectorAll('.cover img').forEach(i=>i.remove());
+  markCardLoading(id,false);
+  card.querySelector('[data-remove-poster]')?.replaceWith(cardPosterButton(id,false));
 }
