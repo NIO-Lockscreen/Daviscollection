@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cover Audit</title>
+<style>
+  :root{--bg:#0b1020;--panel:#141a2e;--line:rgba(255,255,255,.12);--text:#f6f7fb;--muted:#a9b1c7;--good:#86efac;--bad:#fca5a5;--warn:#fde68a;--info:#7dd3fc}
+  @media (prefers-color-scheme: light){:root{--bg:#f6f7fb;--panel:#fff;--line:rgba(0,0,0,.12);--text:#111827;--muted:#4b5563;--good:#15803d;--bad:#b91c1c;--warn:#a16207;--info:#0369a1}}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--text);font:15px/1.45 system-ui,-apple-system,"Segoe UI",sans-serif}
+  main{max-width:1100px;margin:0 auto;padding:20px 16px 60px}
+  h1{margin:0 0 6px;font-size:1.6rem}
+  p{color:var(--muted);margin:0 0 14px}
+  button{font:inherit;border:1px solid var(--line);background:var(--panel);color:var(--text);border-radius:999px;padding:9px 15px;cursor:pointer}
+  button:disabled{opacity:.5;cursor:default}
+  .bar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:14px 0}
+  .summary{display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin:14px 0}
+  .summary div{background:var(--panel);border:1px solid var(--line);border-radius:14px;padding:10px 12px}
+  .summary small{display:block;color:var(--muted);font-size:.75rem}
+  .summary strong{font-size:1.3rem}
+  .filters label{margin-right:12px;color:var(--muted);font-size:.9rem}
+  table{width:100%;border-collapse:collapse}
+  td{border-top:1px solid var(--line);padding:8px 6px;vertical-align:top}
+  td.img{width:64px}
+  td.img img{width:56px;aspect-ratio:2/3;object-fit:cover;border-radius:6px;background:var(--panel);display:block}
+  .v{font-weight:700;font-size:.8rem;white-space:nowrap}
+  .CORRECT{color:var(--good)}.WRONG{color:var(--bad)}.RISKY{color:var(--warn)}.MISS,.SAFE_NONE{color:var(--muted)}
+  .muted{color:var(--muted);font-size:.85rem}
+  @media (max-width:640px){td.exp{display:none}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Cover audit</h1>
+  <p>Runs the app's automatic cover matching over a hand-labelled list of titles from the collection and checks whether each cover is the right film. It only reads; your collection is not changed. Takes a few minutes.</p>
+  <div class="bar">
+    <button id="runBtn">Run audit</button>
+    <button id="copyBtn" disabled>Copy results (JSON)</button>
+    <span id="status" class="muted"></span>
+  </div>
+  <div class="summary" id="summary"></div>
+  <div class="filters" id="filters" hidden>
+    <label><input type="checkbox" value="WRONG" checked> Wrong</label>
+    <label><input type="checkbox" value="RISKY" checked> Risky</label>
+    <label><input type="checkbox" value="CORRECT" checked> Correct</label>
+    <label><input type="checkbox" value="MISS" checked> No cover</label>
+    <label><input type="checkbox" value="SAFE_NONE" checked> Correctly skipped</label>
+  </div>
+  <table><tbody id="rows"></tbody></table>
+</main>
+<script>
+  // Stand-ins for app globals that covers.js may reference outside the lookup path.
+  var state={movies:[]}, els={};
+  function save(){return true} function toast(){} function render(){}
+  function today(){return new Date().toISOString().slice(0,10)}
+  function escapeHtml(s=''){return String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]))}
+</script>
+<script src="../../js/covers.js"></script>
+<script src="judge.js"></script>
+<script>
+const LABEL={CORRECT:'Correct',WRONG:'Wrong film',RISKY:'Risky guess',MISS:'No cover',SAFE_NONE:'Correctly skipped'};
+let results=[];
+// The exact automatic decision when available; older builds only had lookupSmartCover.
+async function autoCover(e){
+  const movie={title:e.title, section:e.section, format:e.format, catalog:e.catalog};
+  if(typeof findAutoCover==='function') return findAutoCover(movie,{useCache:false});
+  return lookupSmartCover(e.title,{section:e.section, format:e.format},false);
+}
+async function runAudit({concurrency=2, onRow}={}){
+  const gt=await (await fetch('ground-truth.json',{cache:'no-cache'})).json();
+  const queue=[...gt.entries], rows=[];
+  async function worker(){
+    while(queue.length){
+      const entry=queue.shift();
+      let result=null, error='';
+      try{ result=await autoCover(entry); }catch(err){ error=String(err && err.message || err); }
+      const r={entry, result:result && {posterUrl:result.posterUrl, provider:result.provider, title:result.title, year:result.year, confidence:result.confidence, pageUrl:result.pageUrl}, error, verdict:CoverAudit.judge(entry,result)};
+      rows.push(r); onRow && onRow(r, rows.length, gt.entries.length);
+    }
+  }
+  await Promise.all(Array.from({length:concurrency},worker));
+  const order=gt.entries.map(e=>e.id);
+  rows.sort((a,b)=>order.indexOf(a.entry.id)-order.indexOf(b.entry.id));
+  return {summary:CoverAudit.summarize(rows), rows, mode:typeof findAutoCover==='function'?'findAutoCover':'lookupSmartCover', at:new Date().toISOString()};
+}
+function rowHtml(r){
+  const e=r.entry, res=r.result;
+  const exp=e.accept.length ? e.accept.map(a=>`${escapeHtml(a.title)} (${a.year})`).join(' / ') : '—';
+  const got=res ? `${escapeHtml(res.title||'?')} ${res.year?`(${escapeHtml(res.year)})`:''}<div class="muted">${escapeHtml(res.provider||'')} · ${Math.round((res.confidence||0)*100)}%</div>` : `<span class="muted">${r.error?escapeHtml(r.error):'no cover'}</span>`;
+  return `<tr data-v="${r.verdict}"><td class="img">${res?`<img src="${escapeHtml(res.posterUrl)}" alt="" loading="lazy">`:''}</td>
+    <td><strong>${escapeHtml(e.title)}</strong><div class="muted">${escapeHtml(e.section)}${e.ambiguous?' · ambiguous':''}</div></td>
+    <td class="exp"><div class="muted">Expected</div>${exp}</td><td><div class="muted">Got</div>${got}</td>
+    <td class="v ${r.verdict}">${LABEL[r.verdict]}</td></tr>`;
+}
+function showSummary(s){
+  const pct=v=>v==null?'—':Math.round(v*100)+'%';
+  document.getElementById('summary').innerHTML=[['Right film when a cover is set',pct(s.precision)],['Clear-cut titles with right cover',pct(s.coverage)],['Correct',s.CORRECT],['Wrong film',s.WRONG],['Risky guesses',s.RISKY],['No cover',s.MISS],['Correctly skipped',s.SAFE_NONE]]
+    .map(([k,v])=>`<div><small>${k}</small><strong>${v}</strong></div>`).join('');
+}
+document.getElementById('runBtn').addEventListener('click',async()=>{
+  const btn=document.getElementById('runBtn'), status=document.getElementById('status'), tbody=document.getElementById('rows');
+  btn.disabled=true; tbody.innerHTML=''; results=[];
+  const report=await runAudit({onRow:(r,i,n)=>{status.textContent=`Checked ${i} of ${n}…`; tbody.insertAdjacentHTML('beforeend',rowHtml(r));}});
+  results=report; tbody.innerHTML=report.rows.map(rowHtml).join(''); showSummary(report.summary);
+  status.textContent=`Done (${report.mode}).`; btn.disabled=false; document.getElementById('copyBtn').disabled=false; document.getElementById('filters').hidden=false;
+});
+document.getElementById('copyBtn').addEventListener('click',async()=>{
+  const text=JSON.stringify(results,null,1);
+  try{await navigator.clipboard.writeText(text); document.getElementById('status').textContent='Copied.';}
+  catch(_){const w=window.open('','_blank'); if(w){w.document.write('<pre>'+escapeHtml(text)+'</pre>');}}
+});
+document.getElementById('filters').addEventListener('change',()=>{
+  const on=new Set([...document.querySelectorAll('#filters input:checked')].map(i=>i.value));
+  document.querySelectorAll('#rows tr').forEach(tr=>tr.hidden=!on.has(tr.dataset.v));
+});
+</script>
+</body>
+</html>

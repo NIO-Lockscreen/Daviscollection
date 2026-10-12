@@ -1,0 +1,3006 @@
+{
+ "about": "Hand-labelled ground truth for automatic cover matching. accept = films whose poster is correct for this disc (any one). ambiguous = several films fit and the shelf does not settle which one dad owns: the safe outcome is NO automatic cover. accept=[] and not ambiguous = not a single film (concert/opera), so any cover is wrong.",
+ "labelledBy": "Claude (review session 2026-10-12); years from general film knowledge, allow +-1.",
+ "entries": [
+  {
+   "id": "seed-608",
+   "title": "THE WILD",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Wild",
+     "year": 2006
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-431",
+   "title": "DADDY’S HOME",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Daddy's Home",
+     "year": 2015
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-681",
+   "title": "MY BIG FAT GREEK WEDDING III",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "My Big Fat Greek Wedding 3",
+     "year": 2023
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-943",
+   "title": "ALL ABOUT EVE SE",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "All About Eve",
+     "year": 1950
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-326",
+   "title": "PICASSO TRIGGER",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Picasso Trigger",
+     "year": 1988
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-351",
+   "title": "BIKINI CAR WASH",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Bikini Carwash Company",
+     "year": 1992
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1117",
+   "title": "TRUST",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Trust",
+     "year": 1990
+    },
+    {
+     "title": "Trust",
+     "year": 2010
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-825",
+   "title": "RIFKIN’S FESTIVAL",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Rifkin's Festival",
+     "year": 2020
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-373",
+   "title": "80’S OVERDRIVE",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-651",
+   "title": "HEART AND SOULS",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Heart and Souls",
+     "year": 1993
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-873",
+   "title": "EXOTICA",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Exotica",
+     "year": 1994
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-336",
+   "title": "MALIBU HIGH",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Malibu High",
+     "year": 1979
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-796",
+   "title": "NEW YORK STORIES",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "New York Stories",
+     "year": 1989
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-496",
+   "title": "CAPTAIN PHILLIP",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Captain Phillips",
+     "year": 2013
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-315",
+   "title": "THE PRINCESS BRIDE",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Princess Bride",
+     "year": 1987
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-365",
+   "title": "WORKING GIRL",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Working Girl",
+     "year": 1988
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-721",
+   "title": "ONE FOR THE MONEY",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "One for the Money",
+     "year": 2012
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-705",
+   "title": "BASIC INSTINCT",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Basic Instinct",
+     "year": 1992
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-348",
+   "title": "SHEENA",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Sheena",
+     "year": 1984
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-523",
+   "title": "MRS HARRIS GOES TO PARIS",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Mrs. Harris Goes to Paris",
+     "year": 2022
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-369",
+   "title": "GARP",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The World According to Garp",
+     "year": 1982
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-841",
+   "title": "THE BIG SHORT",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Big Short",
+     "year": 2015
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-711",
+   "title": "SMOKEY AND THE BANDIT",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Smokey and the Bandit",
+     "year": 1977
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-337",
+   "title": "PORKYS",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Porky's",
+     "year": 1981
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-856",
+   "title": "SOPHIE’S CHOICE",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Sophie's Choice",
+     "year": 1982
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-403",
+   "title": "BARB & STAR GO TO VISTA DEL MAR",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Barb and Star Go to Vista Del Mar",
+     "year": 2021
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-505",
+   "title": "WHEN HARRY MET SALLY",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "When Harry Met Sally...",
+     "year": 1989
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-922",
+   "title": "DOWN WITH LOVE",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Down with Love",
+     "year": 2003
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-919",
+   "title": "PUBLIC ENEMY",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Public Enemy",
+     "year": 1931
+    },
+    {
+     "title": "Public Enemies",
+     "year": 2009
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-340",
+   "title": "FAST TIMES",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Fast Times at Ridgemont High",
+     "year": 1982
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-867",
+   "title": "I DON’T KNOW HOW SHE DOES IT",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "I Don't Know How She Does It",
+     "year": 2011
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-876",
+   "title": "BATMAN THE MOVIE",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Batman",
+     "year": 1966
+    },
+    {
+     "title": "Batman: The Movie",
+     "year": 1966
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-683",
+   "title": "JUNO",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Juno",
+     "year": 2007
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-327",
+   "title": "SAVEGE BEACH",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Savage Beach",
+     "year": 1989
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-503",
+   "title": "SLEEPLESS IN SEATTLE",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Sleepless in Seattle",
+     "year": 1993
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-324",
+   "title": "MALIBU EXPRESS",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Malibu Express",
+     "year": 1985
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-847",
+   "title": "ARGO SE",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Argo",
+     "year": 2012
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-413",
+   "title": "CHALLENGERS",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Challengers",
+     "year": 2024
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-573",
+   "title": "MORNING GLORY",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Morning Glory",
+     "year": 2010
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-706",
+   "title": "SLIVER",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Sliver",
+     "year": 1993
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-424",
+   "title": "WHISKEY, TANGO, FOXTROT",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Whiskey Tango Foxtrot",
+     "year": 2016
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-830",
+   "title": "ENOUGH SAID",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Enough Said",
+     "year": 2013
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-397",
+   "title": "FIVE YEAR ENGAGEMENT",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Five-Year Engagement",
+     "year": 2012
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-861",
+   "title": "CONFESSIONS OF A SHOPAHOLIC",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Confessions of a Shopaholic",
+     "year": 2009
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-592",
+   "title": "RONIN",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Ronin",
+     "year": 1998
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-850",
+   "title": "THE LADY",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Lady",
+     "year": 2011
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-1112",
+   "title": "POISON IVY",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Poison Ivy",
+     "year": 1992
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-975",
+   "title": "GONE WITH THE WIND LD",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Gone with the Wind",
+     "year": 1939
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-462",
+   "title": "GIRLS JUST WANT TO HAVE FUN",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Girls Just Want to Have Fun",
+     "year": 1985
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-382",
+   "title": "COYOTE UGLY",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Coyote Ugly",
+     "year": 2000
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-872",
+   "title": "GRADUATE",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Graduate",
+     "year": 1967
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1714",
+   "title": "NOW YOU SEE ME 2",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Now You See Me 2",
+     "year": 2016
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1731",
+   "title": "GOOD GERMAN",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Good German",
+     "year": 2006
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1616",
+   "title": "RAMBO 1, 2, 3, 4 & 5",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "First Blood",
+     "year": 1982
+    },
+    {
+     "title": "Rambo: First Blood Part II",
+     "year": 1985
+    },
+    {
+     "title": "Rambo III",
+     "year": 1988
+    },
+    {
+     "title": "Rambo",
+     "year": 2008
+    },
+    {
+     "title": "Rambo: Last Blood",
+     "year": 2019
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1663",
+   "title": "MAN ON A LEDGE",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Man on a Ledge",
+     "year": 2012
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1592",
+   "title": "BLACK PANTHER",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Black Panther",
+     "year": 2018
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1708",
+   "title": "CLUELESS",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Clueless",
+     "year": 1995
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1750",
+   "title": "UNIVERSAL SOLDIER",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Universal Soldier",
+     "year": 1992
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1584",
+   "title": "PREDATOR",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Predator",
+     "year": 1987
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1712",
+   "title": "ANCHORMAN",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Anchorman: The Legend of Ron Burgundy",
+     "year": 2004
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1583",
+   "title": "INDEPENDENCE DAY 2",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Independence Day: Resurgence",
+     "year": 2016
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1726",
+   "title": "NORTH BY NORTHWEST",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "North by Northwest",
+     "year": 1959
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1620",
+   "title": "FORD V FERRARI",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Ford v Ferrari",
+     "year": 2019
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1695",
+   "title": "WHY HIM",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Why Him?",
+     "year": 2016
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1458",
+   "title": "LAST HURRAH FOR CHIVALRY + HAND OF DEATH",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Last Hurrah for Chivalry",
+     "year": 1979
+    },
+    {
+     "title": "Hand of Death",
+     "year": 1976
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1420",
+   "title": "CRIME STORY",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Crime Story",
+     "year": 1993
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1393",
+   "title": "KARATE KID (THE NEW)",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Karate Kid",
+     "year": 2010
+    },
+    {
+     "title": "The Next Karate Kid",
+     "year": 1994
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-1482",
+   "title": "MAGNIFICENT WARRIORS",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Magnificent Warriors",
+     "year": 1987
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1364",
+   "title": "SAMMO HUNG COLL.",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-1403",
+   "title": "OPERATION CONDOR 1 & 2",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Armour of God II: Operation Condor",
+     "year": 1991
+    },
+    {
+     "title": "Armour of God",
+     "year": 1986
+    },
+    {
+     "title": "Operation Condor",
+     "year": 1991
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1433",
+   "title": "LUCKY STARS",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "My Lucky Stars",
+     "year": 1985
+    },
+    {
+     "title": "Twinkle, Twinkle Lucky Stars",
+     "year": 1985
+    },
+    {
+     "title": "Winners and Sinners",
+     "year": 1983
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1400",
+   "title": "SUPERCOP",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Police Story 3: Super Cop",
+     "year": 1992
+    },
+    {
+     "title": "Supercop",
+     "year": 1992
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1376",
+   "title": "ENTER THE NINJA",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Enter the Ninja",
+     "year": 1981
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1360",
+   "title": "KNOCKABOUT",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Knockabout",
+     "year": 1979
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1347",
+   "title": "MAN OF TAI CHI",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Man of Tai Chi",
+     "year": 2013
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1487",
+   "title": "MONKEY KUNG FU",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-1330",
+   "title": "DRAGON TIGER GATE",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Dragon Tiger Gate",
+     "year": 2006
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1183",
+   "title": "SUITS 1 – 9",
+   "section": "NEW BLU-RAY – TEMPORARY LIST PLACEMENT",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Suits",
+     "year": 2011
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1141",
+   "title": "STAR TREK – THE NEXT LEVEL",
+   "section": "NEW BLU-RAY – TEMPORARY LIST PLACEMENT",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-1268",
+   "title": "THE GODFATHER",
+   "section": "NEW BLU-RAY – TEMPORARY LIST PLACEMENT",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Godfather",
+     "year": 1972
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1197",
+   "title": "BATTLEFIELD WWII INVASION",
+   "section": "NEW BLU-RAY – TEMPORARY LIST PLACEMENT",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-1255",
+   "title": "BEETHOVEN SYMPHONY NO. 9",
+   "section": "NEW BLU-RAY – TEMPORARY LIST PLACEMENT",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1247",
+   "title": "TUTTO VERDI",
+   "section": "NEW BLU-RAY – TEMPORARY LIST PLACEMENT",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1208",
+   "title": "THE FEMALE BRAIN",
+   "section": "NEW BLU-RAY – TEMPORARY LIST PLACEMENT",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Female Brain",
+     "year": 2017
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1235",
+   "title": "CHRISTMAS MEMORIES",
+   "section": "NEW BLU-RAY – TEMPORARY LIST PLACEMENT",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-1194",
+   "title": "BATMAN COMPLETE TV SERIES LD",
+   "section": "NEW BLU-RAY – TEMPORARY LIST PLACEMENT",
+   "format": "TV / Series",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Batman",
+     "year": 1966
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2179",
+   "title": "BACK TO THE FUTURE 1, 2 & 3",
+   "section": "STEELBOOKS 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Back to the Future",
+     "year": 1985
+    },
+    {
+     "title": "Back to the Future Part II",
+     "year": 1989
+    },
+    {
+     "title": "Back to the Future Part III",
+     "year": 1990
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2191",
+   "title": "DRIVER",
+   "section": "STEELBOOKS 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Driver",
+     "year": 1978
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-2268",
+   "title": "AMERICAN GRAFITTI",
+   "section": "STEELBOOKS 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "American Graffiti",
+     "year": 1973
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2203",
+   "title": "TWISTERS",
+   "section": "STEELBOOKS 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Twisters",
+     "year": 2024
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2248",
+   "title": "GROUNDHOG DAY",
+   "section": "STEELBOOKS 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Groundhog Day",
+     "year": 1993
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2199",
+   "title": "BEEKEEPER",
+   "section": "STEELBOOKS 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Beekeeper",
+     "year": 2024
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2286",
+   "title": "BLOODSPORT",
+   "section": "STEELBOOKS 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Bloodsport",
+     "year": 1988
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2171",
+   "title": "SPIDERMAN NO WAY HOME",
+   "section": "STEELBOOKS 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Spider-Man: No Way Home",
+     "year": 2021
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-193",
+   "title": "TERMINATOR 3",
+   "section": "TV SERIES SHELF",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Terminator 3: Rise of the Machines",
+     "year": 2003
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-117",
+   "title": "HEAT",
+   "section": "TV SERIES SHELF",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Heat",
+     "year": 1995
+    },
+    {
+     "title": "Heat",
+     "year": 1986
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-205",
+   "title": "THE ARRIVAL",
+   "section": "TV SERIES SHELF",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Arrival",
+     "year": 1996
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-179",
+   "title": "TO LIVE AND DIE IN LA",
+   "section": "TV SERIES SHELF",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "To Live and Die in L.A.",
+     "year": 1985
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-181",
+   "title": "DOG DAY AFTERNOON",
+   "section": "TV SERIES SHELF",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Dog Day Afternoon",
+     "year": 1975
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-209",
+   "title": "UNKNOWN",
+   "section": "TV SERIES SHELF",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Unknown",
+     "year": 2011
+    },
+    {
+     "title": "Unknown",
+     "year": 2006
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-220",
+   "title": "THOMAS CROWN AFFAIR 88 FILMS",
+   "section": "TV SERIES SHELF",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Thomas Crown Affair",
+     "year": 1968
+    },
+    {
+     "title": "The Thomas Crown Affair",
+     "year": 1999
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-105",
+   "title": "WAR ROOM",
+   "section": "TV ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "War Room",
+     "year": 2015
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-41",
+   "title": "SHREK 1,2 & 3",
+   "section": "TV ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Shrek",
+     "year": 2001
+    },
+    {
+     "title": "Shrek 2",
+     "year": 2004
+    },
+    {
+     "title": "Shrek the Third",
+     "year": 2007
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-44",
+   "title": "KUNG FU PANDA 1,2 & 3",
+   "section": "TV ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Kung Fu Panda",
+     "year": 2008
+    },
+    {
+     "title": "Kung Fu Panda 2",
+     "year": 2011
+    },
+    {
+     "title": "Kung Fu Panda 3",
+     "year": 2016
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-89",
+   "title": "CHRISTMAS VACATION",
+   "section": "TV ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "National Lampoon's Christmas Vacation",
+     "year": 1989
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-45",
+   "title": "KUNG FU PANDA HOLIDAY",
+   "section": "TV ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Kung Fu Panda Holiday",
+     "year": 2010
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-77",
+   "title": "FOUR CHRISTMASES",
+   "section": "TV ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Four Christmases",
+     "year": 2008
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1953",
+   "title": "GIRL CAN’T HELP IT",
+   "section": "CRITERION COLLECTION",
+   "format": "Blu-ray",
+   "catalog": "1120",
+   "accept": [
+    {
+     "title": "The Girl Can't Help It",
+     "year": 1956
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1948",
+   "title": "MARRIAGE STORY",
+   "section": "CRITERION COLLECTION",
+   "format": "Blu-ray",
+   "catalog": "1038",
+   "accept": [
+    {
+     "title": "Marriage Story",
+     "year": 2019
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1898",
+   "title": "YOUNG MR LINCOLN",
+   "section": "CRITERION COLLECTION",
+   "format": "Blu-ray",
+   "catalog": "320",
+   "accept": [
+    {
+     "title": "Young Mr. Lincoln",
+     "year": 1939
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1901",
+   "title": "ICE STORM",
+   "section": "CRITERION COLLECTION",
+   "format": "Blu-ray",
+   "catalog": "426",
+   "accept": [
+    {
+     "title": "The Ice Storm",
+     "year": 1997
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2033",
+   "title": "SEVEN",
+   "section": "KL BLUERAY",
+   "format": "Blu-ray",
+   "catalog": "22858",
+   "accept": [
+    {
+     "title": "Seven",
+     "year": 1979
+    },
+    {
+     "title": "Seven",
+     "year": 1995
+    },
+    {
+     "title": "Se7en",
+     "year": 1995
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-2046",
+   "title": "EMANUELLE 2",
+   "section": "KL BLUERAY",
+   "format": "Blu-ray",
+   "catalog": "23642",
+   "accept": [
+    {
+     "title": "Emmanuelle 2",
+     "year": 1975
+    },
+    {
+     "title": "Black Emanuelle 2",
+     "year": 1976
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-2060",
+   "title": "EVERY DAY’S A HOLIDAY",
+   "section": "KL BLUERAY",
+   "format": "Blu-ray",
+   "catalog": "25354",
+   "accept": [
+    {
+     "title": "Every Day's a Holiday",
+     "year": 1937
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2058",
+   "title": "GO WEST YOUNG MAN",
+   "section": "KL BLUERAY",
+   "format": "Blu-ray",
+   "catalog": "25353",
+   "accept": [
+    {
+     "title": "Go West, Young Man",
+     "year": 1936
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1844",
+   "title": "EDGE OF TOMORROW",
+   "section": "BOX SETS 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Edge of Tomorrow",
+     "year": 2014
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1843",
+   "title": "APOCALYPSE NOW",
+   "section": "BOX SETS 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Apocalypse Now",
+     "year": 1979
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1886",
+   "title": "VALLEY GIRL",
+   "section": "BOX SETS 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Valley Girl",
+     "year": 1983
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-275",
+   "title": "TRIUMPH OF THE WILL",
+   "section": "WAR MOVIES",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Triumph of the Will",
+     "year": 1935
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-250",
+   "title": "THE GUNS OF NAVARONE",
+   "section": "WAR MOVIES",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Guns of Navarone",
+     "year": 1961
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-272",
+   "title": "TOP GUN A",
+   "section": "WAR MOVIES",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Top Gun",
+     "year": 1986
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2111",
+   "title": "KINGSPIN",
+   "section": "KL 4K",
+   "format": "4K UHD",
+   "catalog": "27025",
+   "accept": [
+    {
+     "title": "Kingpin",
+     "year": 1996
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2103",
+   "title": "GUNFIGHT O.K. CORRAL",
+   "section": "KL 4K",
+   "format": "4K UHD",
+   "catalog": "26573",
+   "accept": [
+    {
+     "title": "Gunfight at the O.K. Corral",
+     "year": 1957
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2093",
+   "title": "MANCHURIAN CANDIDATE",
+   "section": "KL 4K",
+   "format": "4K UHD",
+   "catalog": "26307",
+   "accept": [
+    {
+     "title": "The Manchurian Candidate",
+     "year": 1962
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1805",
+   "title": "POLAR EXPRESS",
+   "section": "4K DISNEY",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Polar Express",
+     "year": 2004
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1795",
+   "title": "CARS",
+   "section": "4K DISNEY",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Cars",
+     "year": 2006
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1977",
+   "title": "SCARFACE 4K",
+   "section": "CRITERION 4K",
+   "format": "4K UHD",
+   "catalog": "1239",
+   "accept": [
+    {
+     "title": "Scarface",
+     "year": 1932
+    },
+    {
+     "title": "Scarface",
+     "year": 1983
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-1967",
+   "title": "RAGINGBULL 4K",
+   "section": "CRITERION 4K",
+   "format": "4K UHD",
+   "catalog": "1134",
+   "accept": [
+    {
+     "title": "Raging Bull",
+     "year": 1980
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1813",
+   "title": "D-DAY",
+   "section": "DOKUMENTARY 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-1827",
+   "title": "PLANET EARTH II",
+   "section": "DOKUMENTARY 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Planet Earth II",
+     "year": 2016
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2001",
+   "title": "48 HOURS",
+   "section": "PARAMOUNT PRESENTS",
+   "format": "Blu-ray",
+   "catalog": "19",
+   "accept": [
+    {
+     "title": "48 Hrs.",
+     "year": 1982
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1995",
+   "title": "GHOST SE 8",
+   "section": "PARAMOUNT PRESENTS",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Ghost",
+     "year": 1990
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2310",
+   "title": "BATTLE OF BRITAIN",
+   "section": "STEELBOOK/BLUERAY",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Battle of Britain",
+     "year": 1969
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2294",
+   "title": "FERRIS BUELLER’S DAY OFF",
+   "section": "STEELBOOK/BLUERAY",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Ferris Bueller's Day Off",
+     "year": 1986
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2133",
+   "title": "GOOD, BAD & UGLY",
+   "section": "ARROW 4K",
+   "format": "4K UHD",
+   "catalog": "2578",
+   "accept": [
+    {
+     "title": "The Good, the Bad and the Ugly",
+     "year": 1966
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2119",
+   "title": "MALLRATS",
+   "section": "ARROW 4K",
+   "format": "4K UHD",
+   "catalog": "508",
+   "accept": [
+    {
+     "title": "Mallrats",
+     "year": 1995
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1519",
+   "title": "INSPECTOR WEARS SKIRTS 3",
+   "section": "88 FILMS",
+   "format": "Blu-ray",
+   "catalog": "552",
+   "accept": [
+    {
+     "title": "The Inspector Wears Skirts III",
+     "year": 1990
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1522",
+   "title": "POSTMAN FIGHTS BACK",
+   "section": "88 FILMS",
+   "format": "Blu-ray",
+   "catalog": "535",
+   "accept": [
+    {
+     "title": "The Postman Fights Back",
+     "year": 1982
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2318",
+   "title": "MISFITS",
+   "section": "4K BOOKS",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Misfits",
+     "year": 1961
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2325",
+   "title": "THELMA & LOUISE",
+   "section": "4K BOOKS",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Thelma & Louise",
+     "year": 1991
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1501",
+   "title": "WHEN TAEKWONDO STRIKES",
+   "section": "EUREKA BLUERAY",
+   "format": "Blu-ray",
+   "catalog": "70516",
+   "accept": [
+    {
+     "title": "When Taekwondo Strikes",
+     "year": 1973
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1504",
+   "title": "BLACK MASK",
+   "section": "EUREKA BLUERAY",
+   "format": "Blu-ray",
+   "catalog": "70526",
+   "accept": [
+    {
+     "title": "Black Mask",
+     "year": 1996
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1550",
+   "title": "DRIVE",
+   "section": "KUNG FU 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Drive",
+     "year": 1997
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1551",
+   "title": "CROUCHING TIGER HIDDEN DRAGON",
+   "section": "KUNG FU 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Crouching Tiger, Hidden Dragon",
+     "year": 2000
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1557",
+   "title": "ARMOUR OF GOD",
+   "section": "KUNG FU BOX",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Armour of God",
+     "year": 1986
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1558",
+   "title": "POLICE STORY 1 & 2",
+   "section": "KUNG FU BOX",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Police Story",
+     "year": 1985
+    },
+    {
+     "title": "Police Story 2",
+     "year": 1988
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2150",
+   "title": "PEKING OPERA BLUES",
+   "section": "SHOUT 4K",
+   "format": "4K UHD",
+   "catalog": "565",
+   "accept": [
+    {
+     "title": "Peking Opera Blues",
+     "year": 1986
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2149",
+   "title": "CITY ON FIRE",
+   "section": "SHOUT 4K",
+   "format": "4K UHD",
+   "catalog": "543",
+   "accept": [
+    {
+     "title": "City on Fire",
+     "year": 1987
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1538",
+   "title": "MIRACLES",
+   "section": "88 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Miracles",
+     "year": 1989
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1534",
+   "title": "BODYGUARD IN BEIJING",
+   "section": "88 4K",
+   "format": "4K UHD",
+   "catalog": "025",
+   "accept": [
+    {
+     "title": "The Bodyguard from Beijing",
+     "year": 1994
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1278",
+   "title": "SAS",
+   "section": "TV SECTION (NEED TO BE ARRANGED)",
+   "format": "TV / Series",
+   "catalog": "",
+   "accept": [],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-1280",
+   "title": "WONDER WOMAN",
+   "section": "TV SECTION (NEED TO BE ARRANGED)",
+   "format": "TV / Series",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Wonder Woman",
+     "year": 2017
+    },
+    {
+     "title": "Wonder Woman",
+     "year": 1975
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-2160",
+   "title": "ALL LADIES DO IT",
+   "section": "V-SYNDROME 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "All Ladies Do It",
+     "year": 1992
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2158",
+   "title": "LIKE IT HOT",
+   "section": "V-SYNDROME 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-1986",
+   "title": "BLONDIE 4K",
+   "section": "CLASSIC FILM",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-1987",
+   "title": "MEET JOHN DOE",
+   "section": "CLASSIC FILM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Meet John Doe",
+     "year": 1941
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2139",
+   "title": "PRODIGAL SON",
+   "section": "ARROW BLUERAY",
+   "format": "Blu-ray",
+   "catalog": "532",
+   "accept": [
+    {
+     "title": "The Prodigal Son",
+     "year": 1981
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-2140",
+   "title": "DESPERATE HOURS",
+   "section": "ARROW BLUERAY",
+   "format": "Blu-ray",
+   "catalog": "533",
+   "accept": [
+    {
+     "title": "Desperate Hours",
+     "year": 1990
+    },
+    {
+     "title": "The Desperate Hours",
+     "year": 1955
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-1495",
+   "title": "TOUCH OF EVIL",
+   "section": "EUREKA 4K",
+   "format": "4K UHD",
+   "catalog": "70501",
+   "accept": [
+    {
+     "title": "Touch of Evil",
+     "year": 1958
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1494",
+   "title": "POLICE STORY TRILOGY",
+   "section": "EUREKA 4K",
+   "format": "4K UHD",
+   "catalog": "70470",
+   "accept": [
+    {
+     "title": "Police Story",
+     "year": 1985
+    },
+    {
+     "title": "Police Story 2",
+     "year": 1988
+    },
+    {
+     "title": "Police Story 3: Super Cop",
+     "year": 1992
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1540",
+   "title": "NAVY SEALS 4K",
+   "section": "VINEGAR SYNDROME",
+   "format": "4K UHD",
+   "catalog": "009",
+   "accept": [
+    {
+     "title": "Navy SEALs",
+     "year": 1990
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1543",
+   "title": "CHINA O’BRIEN 1 & 2 4K",
+   "section": "VINEGAR SYNDROME",
+   "format": "4K UHD",
+   "catalog": "468",
+   "accept": [
+    {
+     "title": "China O'Brien",
+     "year": 1990
+    },
+    {
+     "title": "China O'Brien II",
+     "year": 1991
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-459",
+   "title": "10",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "10",
+     "year": 1979
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-982",
+   "title": "1776",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "1776",
+     "year": 1972
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1579",
+   "title": "2001",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "2001: A Space Odyssey",
+     "year": 1968
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1615",
+   "title": "1917",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "1917",
+     "year": 2019
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1669",
+   "title": "355",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The 355",
+     "year": 2022
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1939",
+   "title": "1984",
+   "section": "CRITERION COLLECTION",
+   "format": "Blu-ray",
+   "catalog": "984",
+   "accept": [
+    {
+     "title": "Nineteen Eighty-Four",
+     "year": 1984
+    },
+    {
+     "title": "1984",
+     "year": 1956
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-126",
+   "title": "15 MINUTES",
+   "section": "TV SERIES SHELF",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "15 Minutes",
+     "year": 2001
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-376",
+   "title": "4 WEDDINGS AND A FUNERAL",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Four Weddings and a Funeral",
+     "year": 1994
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-578",
+   "title": "80 FOR BRADY",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "80 for Brady",
+     "year": 2023
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-639",
+   "title": "2 DAYS IN NEW YORK",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "2 Days in New York",
+     "year": 2012
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-948",
+   "title": "5 AGAINST THE HOUSE",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "5 Against the House",
+     "year": 1955
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-990",
+   "title": "310 TO YUMA",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "3:10 to Yuma",
+     "year": 1957
+    },
+    {
+     "title": "3:10 to Yuma",
+     "year": 2007
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-16",
+   "title": "ALADDIN DIAMOND EDITION",
+   "section": "TV ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Aladdin",
+     "year": 1992
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-17",
+   "title": "ALADDIN",
+   "section": "TV ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Aladdin",
+     "year": 1992
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1784",
+   "title": "ALADDIN",
+   "section": "4K DISNEY",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Aladdin",
+     "year": 1992
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1785",
+   "title": "ALADDIN LIVE",
+   "section": "4K DISNEY",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Aladdin",
+     "year": 2019
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-18",
+   "title": "LION KING",
+   "section": "TV ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Lion King",
+     "year": 1994
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1787",
+   "title": "LION KING LIVE",
+   "section": "4K DISNEY",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Lion King",
+     "year": 2019
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1634",
+   "title": "HEAT",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Heat",
+     "year": 1995
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2065",
+   "title": "HEAT",
+   "section": "KL BLUERAY",
+   "format": "Blu-ray",
+   "catalog": "26246",
+   "accept": [
+    {
+     "title": "Heat",
+     "year": 1986
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-1727",
+   "title": "PSYCHO",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Psycho",
+     "year": 1960
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-116",
+   "title": "SCARFACE",
+   "section": "TV SERIES SHELF",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Scarface",
+     "year": 1983
+    },
+    {
+     "title": "Scarface",
+     "year": 1932
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-1631",
+   "title": "SCARFACE",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Scarface",
+     "year": 1983
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-188",
+   "title": "ROBOCOP",
+   "section": "TV SERIES SHELF",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "RoboCop",
+     "year": 1987
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-1802",
+   "title": "BEAUTY AND THE BEAST",
+   "section": "4K DISNEY",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Beauty and the Beast",
+     "year": 1991
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1803",
+   "title": "BEAUTY AND THE BEAST LIVE",
+   "section": "4K DISNEY",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Beauty and the Beast",
+     "year": 2017
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-20",
+   "title": "MULAN",
+   "section": "TV ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Mulan",
+     "year": 1998
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1788",
+   "title": "JUNGLE BOOK LIVE",
+   "section": "4K DISNEY",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Jungle Book",
+     "year": 2016
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1783",
+   "title": "THE LITTLE MERMAID",
+   "section": "4K DISNEY",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Little Mermaid",
+     "year": 1989
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-1576",
+   "title": "STAR WARS THE LAST JEDI",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Star Wars: The Last Jedi",
+     "year": 2017
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1530",
+   "title": "PROJECT A",
+   "section": "88 4K",
+   "format": "4K UHD",
+   "catalog": "005",
+   "accept": [
+    {
+     "title": "Project A",
+     "year": 1983
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1422",
+   "title": "DRUNKEN MASTER",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Drunken Master",
+     "year": 1978
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1424",
+   "title": "DRUNKEN MASTER 2",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Drunken Master II",
+     "year": 1994
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1341",
+   "title": "FEARLESS",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Fearless",
+     "year": 2006
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1408",
+   "title": "FEARLESS HYENA",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "The Fearless Hyena",
+     "year": 1979
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1343",
+   "title": "HERO",
+   "section": "KUNG FU",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Hero",
+     "year": 2002
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-978",
+   "title": "TITANIC",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Titanic",
+     "year": 1997
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1732",
+   "title": "JAWS",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Jaws",
+     "year": 1975
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2184",
+   "title": "ROCKY V",
+   "section": "STEELBOOKS 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Rocky V",
+     "year": 1990
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-2185",
+   "title": "ROCKY BALBOA",
+   "section": "STEELBOOKS 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Rocky Balboa",
+     "year": 2006
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-875",
+   "title": "BATMAN",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Batman",
+     "year": 1989
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-2175",
+   "title": "BATMAN",
+   "section": "STEELBOOKS 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Batman",
+     "year": 1989
+    },
+    {
+     "title": "The Batman",
+     "year": 2022
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-449",
+   "title": "SUPERMAN",
+   "section": "DATA ROOM",
+   "format": "Blu-ray",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Superman",
+     "year": 1978
+    }
+   ],
+   "ambiguous": true
+  },
+  {
+   "id": "seed-2213",
+   "title": "OPPENHEIMER",
+   "section": "STEELBOOKS 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Oppenheimer",
+     "year": 2023
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1724",
+   "title": "AMADEUS",
+   "section": "4K MOVIES",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Amadeus",
+     "year": 1984
+    }
+   ],
+   "ambiguous": false
+  },
+  {
+   "id": "seed-1819",
+   "title": "ROCKY MOUNTAN EXPRESS",
+   "section": "DOKUMENTARY 4K",
+   "format": "4K UHD",
+   "catalog": "",
+   "accept": [
+    {
+     "title": "Rocky Mountain Express",
+     "year": 2011
+    }
+   ],
+   "ambiguous": false
+  }
+ ]
+}
