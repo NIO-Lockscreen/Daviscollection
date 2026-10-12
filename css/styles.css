@@ -322,3 +322,11 @@ video{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
 @media (max-width:980px){
   .backupMenu{right:auto;left:0;width:min(300px,calc(100vw - 24px))}
 }
+
+/* scanner */
+.scanner canvas{display:none}
+.scanStatus{white-space:pre-line}
+.scanStatus.warn{color:var(--warn);font-weight:600}
+.scanFallback{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-top:10px;color:var(--muted);font-size:.9rem}
+.scanFallback[hidden]{display:none}
+.scanFallback a{display:inline-flex;align-items:center;text-decoration:none;word-break:break-all}
