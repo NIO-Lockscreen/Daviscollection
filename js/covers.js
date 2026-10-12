@@ -385,7 +385,7 @@ function getCoverSettings(){
 function smartCoverCacheKey(title, options={}){
   const cleaned=normalizeTitle(title);
   const year=options.year || cleaned.year || inferYearFromTitle(cleaned.title);
-  return `${cleaned.cacheKey}:${year || ''}:auto-v8${options.hint?'-'+options.hint:''}${options.catalogYear?'-c'+options.catalogYear:''}`;
+  return `${cleaned.cacheKey}:${year || ''}:auto-v8${options.kind==='tv'?'-tv':''}${options.hint?'-'+options.hint:''}${options.catalogYear?'-c'+options.catalogYear:''}`;
 }
 function getSmartCoverCache(key){
   try{
@@ -442,6 +442,7 @@ function unrejectCover(title, url){
    Auto mode therefore never fuzzy-matches: a candidate must have exactly the collection's title (articles, case, punctuation
    and a few collection suffixes ignored). Wikipedia decides WHICH film it is (and whether several films share the title);
    TMDB / iTunes then supply a sharper poster of that same film, with Wikipedia's own poster as the fallback.
+   Every image, from every provider, must load and be a portrait poster (logos, title cards, stills and photos are not).
    Anything ambiguous returns null and is left to the manual picker.
    ====================================================================================================== */
 const AUTO_AMBIGUOUS = Symbol('ambiguous');
@@ -470,12 +471,13 @@ async function findAutoCover(movie, {useCache=false, validateImage=true}={}){
   const raw=String(movie?.title ?? '');
   const paren=raw.match(/\s*\(((?:18|19|20)\d{2})\)\s*$/);   // "HEAT (1995)": an explicit release year
   const cleaned=normalizeTitle(paren ? raw.slice(0,paren.index) : raw);
-  if(!cleaned.title || isMultiFilmTitle(cleaned.title) || /^(TV \/ Series|Box set)$/i.test(String(movie?.format||''))) return null;
+  if(!cleaned.title || isMultiFilmTitle(cleaned.title) || /^Box set$/i.test(String(movie?.format||''))) return null;
+  const kind=/^TV \/ Series$/i.test(String(movie?.format||'')) ? 'tv' : 'film';   // a TV series is only looked for when the format says TV
   const year=(paren && paren[1]) || cleaned.year || inferYearFromTitle(cleaned.title);
   const catalog=String(movie?.catalog ?? '').trim();
   const catalogYear=/^(?:189\d|19\d\d|20[0-3]\d)$/.test(catalog) ? catalog : '';   // the importer keeps a trailing number of the title in `catalog`
   const hint=sectionHint(movie?.section);
-  const cacheKey=smartCoverCacheKey(raw, {year, hint, catalogYear});
+  const cacheKey=smartCoverCacheKey(raw, {year, hint, catalogYear, kind});
   const isRejected=coverRejectChecker(smartCoverCacheKey(raw));
   if(useCache){
     const cached=getSmartCoverCache(cacheKey);
@@ -484,7 +486,7 @@ async function findAutoCover(movie, {useCache=false, validateImage=true}={}){
   const flightKey=cacheKey+(validateImage?'':'|nv');
   if(coverInflight.has(flightKey)) return coverInflight.get(flightKey);
   const variants=buildTitleVariants(cleaned.title, year, true);
-  const ctx={cleaned, year, catalogYear, hint, isRejected, validate:validateImage, settings:getCoverSettings(), variants, wanted:new Set(variants.map(simpleText))};
+  const ctx={cleaned, kind, year, catalogYear, hint, isRejected, validate:validateImage, settings:getCoverSettings(), variants, wanted:new Set(variants.map(simpleText))};
   const task=resolveAutoCover(ctx).then(result=>{
     // Only an answer ("found" or a genuine "no match") is cached. Errors throw and skip this line.
     if(useCache) setSmartCoverCache(cacheKey, result, result ? COVER_SUCCESS_CACHE_DAYS : COVER_FAIL_CACHE_DAYS);
@@ -505,9 +507,11 @@ async function resolveAutoCover(ctx){
   if(wiki===undefined) throw coverError('network', 'Wikipedia unavailable: cannot rule out other films with this title');
   if(wiki.status==='ambiguous') return null;
   const film=wiki.status==='unique' ? wiki.film : null;
-  const sources=[];
-  if(ctx.settings.tmdbKey && !tmdbRejected) sources.push(()=>tmdbExactFilms(ctx));
-  sources.push(()=>itunesExactFilms(ctx));
+  const sources=[];   // TMDB / iTunes search movies only; a TV series gets Wikipedia's poster
+  if(ctx.kind==='film'){
+    if(ctx.settings.tmdbKey && !tmdbRejected) sources.push(()=>tmdbExactFilms(ctx));
+    sources.push(()=>itunesExactFilms(ctx));
+  }
   const options=[];   // poster candidates for the decided film, best first
   for(const source of sources){
     const films=await attempt(source);
@@ -516,16 +520,23 @@ async function resolveAutoCover(ctx){
     if(pick===AUTO_AMBIGUOUS) return null;
     if(pick){options.push(pick); break;}
   }
-  if(film){
-    if(film.posterUrl && !ctx.isRejected(film.posterUrl)) options.push(wikipediaCover(film, film.posterUrl, 'Wikipedia Infobox/PageImages'));
-    else if(!film.posterUrl && !options.length){   // last resort: read the infobox of that ONE page for its poster file
-      const image=await attempt(()=>getWikipediaInfoboxPosterUrl(film.page));
-      if(image && !ctx.isRejected(image.url)) options.push(wikipediaCover(film, image.url, 'Wikipedia Infobox'));
+  if(film && film.posterUrl && !ctx.isRejected(film.posterUrl)) options.push(wikipediaCover(film, film.posterUrl, 'Wikipedia Infobox/PageImages'));
+  const tried=new Set();
+  const usable=async option=>{
+    if(tried.has(option.posterUrl)) return false;
+    tried.add(option.posterUrl);
+    if(!ctx.validate) return true;
+    const verdict=await preloadCover(option);
+    if(verdict==='error') failed=true;   // the image does not load: never store it, and do not call this a genuine "no match"
+    return verdict==='ok';                // 'shape': it loaded but is a logo/photo/title card, a definite "not this one"
+  };
+  for(const option of options) if(await usable(option)) return option;
+  if(film){   // last resort: the infobox of that ONE page names its poster file (the page image was missing, a still, a photo or dead)
+    const image=await attempt(()=>getWikipediaInfoboxPosterUrl(film.page));
+    if(image && !ctx.isRejected(image.url)){
+      const option=wikipediaCover(film, image.url, 'Wikipedia Infobox');
+      if(await usable(option)) return option;
     }
-  }
-  for(const option of options){
-    if(!ctx.validate || await preloadCover(option)) return option;
-    failed=true;   // the image does not load: never store it, and do not call this a genuine "no match"
   }
   if(failed) throw coverError('network', 'Cover providers unavailable');
   return null;
@@ -554,20 +565,29 @@ function yearClusters(list){
   for(const y of years){if(y-prev>1) clusters++; prev=y;}
   return clusters;
 }
-function preloadImage(url, timeoutMs=10000){
+/* A poster is portrait (at least 1.25x taller than wide) and not tiny. Logos, photos, title cards and stills are landscape or square. */
+function isPortrait(width, height){return width>=150 && height>=1.25*width;}
+/* Loads the image: 'ok' (a portrait poster), 'shape' (loads fine but is not poster-shaped) or 'error' (dead link / timeout / not an image). */
+function imageVerdict(url, timeoutMs=10000){
   return new Promise(resolve=>{
     const img=new Image();
-    const timer=setTimeout(()=>{img.onload=img.onerror=null; resolve(false);}, timeoutMs);
-    img.onload=()=>{clearTimeout(timer); resolve(img.naturalWidth>0 && img.naturalHeight>0);};
-    img.onerror=()=>{clearTimeout(timer); resolve(false);};
+    const timer=setTimeout(()=>{img.onload=img.onerror=null; resolve('error');}, timeoutMs);
+    img.onload=()=>{clearTimeout(timer); resolve(isPortrait(img.naturalWidth, img.naturalHeight) ? 'ok' : 'shape');};
+    img.onerror=()=>{clearTimeout(timer); resolve('error');};
     img.src=url;
   });
 }
+async function preloadImage(url, timeoutMs=10000){return (await imageVerdict(url, timeoutMs))==='ok';}
+/* Checks the candidate's URLs in turn (iTunes has a smaller alternate size); on 'ok' posterUrl is the one that worked. */
 async function preloadCover(c){
+  let verdict='error';
   for(const url of [c.posterUrl, c.altUrl]){
-    if(url && await preloadImage(url)){c.posterUrl=url; return true;}
+    if(!url) continue;
+    const v=await imageVerdict(url);
+    if(v==='ok'){c.posterUrl=url; return 'ok';}
+    if(v==='shape') verdict='shape';
   }
-  return false;
+  return verdict;
 }
 
 /* ---------- Auto: exact-title films per provider ---------- */
@@ -596,24 +616,37 @@ async function tmdbExactFilms(ctx){
 // pilicense=any: film posters are non-free images, which PageImages hides by default. 500 px is a standard Wikimedia thumbnail width.
 // `description` is the article's short description ("1995 American crime film directed by Michael Mann").
 const WIKI_PAGE_PROPS = {prop:'pageimages|description|extracts|pageprops', piprop:'thumbnail|name', pilicense:'any', pithumbsize:'500', pilimit:'max', exintro:'1', explaintext:'1', exchars:'300', exlimit:'max', ppprop:'disambiguation'};
-const WIKI_NON_FILM = /\b(series|franchise|soundtrack|album|novel|book|game|song|band|character|comics?|play)\b/i;
+// What an accepted page must BE. `head` is tested against the first noun phrase of the short description, so "1995 American crime film
+// directed by ..." passes while "American film director", "Year", "List of ... films" and "Film series" do not.
+const WIKI_KINDS = {
+  film:{qualifier:/\b(?:film|movie)\b/i, head:/\b(?:film|movie)(?:\s+(?:adaptation|noir))?$/i, sentence:/\b(?:is|was) an? [^.]{0,150}?\b(?:film|movie)\b/i, probes:['film'], search:'film'},
+  tv:{qualifier:/\b(?:tv series|television series|miniseries)\b/i, head:/\b(?:series|miniseries|show|sitcom|serial|soap opera|telenovela)$/i, sentence:/\b(?:is|was) an? [^.]{0,150}?\b(?:series|miniseries|show|sitcom)\b/i, probes:['TV series','miniseries'], search:'television series'}
+};
+const WIKI_HEAD_END = /\s+(?:by|directed|starring|about|based|from|featuring|set|in|of|with|that|which|written|produced|released|for|on|at|made|where)\b|[,;(:]/i;
+function wikiHeadPhrase(description){return String(description).split(WIKI_HEAD_END)[0].trim();}
 async function wikiQuery(params){
   const url=new URL('https://en.wikipedia.org/w/api.php');
   for(const [k,v] of Object.entries({action:'query', format:'json', formatversion:'2', origin:'*', ...params})) url.searchParams.set(k, v);
   return fetchJson(url.toString());
 }
 function isDisambiguation(page){return !!(page?.pageprops && 'disambiguation' in page.pageprops);}
-/* null unless the page is a film article whose title (minus "(… film)", "The"/"A") is one of the wanted titles. */
-function wikiFilmInfo(page, wanted){
+/* null unless the page IS a film (or, kind 'tv', a TV series) whose title (minus "(… film)", "The"/"A") is one of the wanted titles.
+   Year, list, disambiguation, person and place pages fail the head-noun test. A page image that is not portrait (a still, a logo,
+   a photo) is not offered as the poster: posterUrl stays '' and the infobox is consulted instead. */
+function wikiFilmInfo(page, wanted, kind='film'){
+  const K=WIKI_KINDS[kind];
   const title=page.title || '';
   if(!wanted.has(simpleText(stripArticleQualifier(title)))) return null;
   const description=page.description || '';
   const extract=String(page.extract || '').slice(0,300);
   const qualifier=(title.match(/\(([^)]*)\)\s*$/) || [])[1] || '';
-  if(qualifier && !/\b(film|movie)\b/i.test(qualifier)) return null;   // "Heat (band)", "Drive (TV series)"
-  const isFilm=description ? (/\b(film|movie)\b/i.test(description) && !WIKI_NON_FILM.test(description)) : (/\b(film|movie)\b/i.test(qualifier) || /\b(film|movie)\b/i.test(extract));
-  if(!isFilm) return null;
-  return {fullTitle:title, title:stripArticleQualifier(title), year:extractYearFromText(description) || extractYearFromText(qualifier) || extractYearFromText(extract), description:description || extract, posterUrl:page.thumbnail?.source || page.original?.source || '', pageUrl:'https://en.wikipedia.org/wiki/'+encodeURIComponent(title.replace(/ /g,'_')), page};
+  if(qualifier && !K.qualifier.test(qualifier)) return null;   // "Heat (band)"; "Drive (TV series)" when looking for films
+  // Without a short description, require both an explicit "(… film)" title and an "X is a … film" opening sentence.
+  const ok=description ? K.head.test(wikiHeadPhrase(description)) : (K.qualifier.test(qualifier) && K.sentence.test(extract));
+  if(!ok) return null;
+  const thumb=page.thumbnail;
+  const posterUrl=thumb && thumb.width && thumb.height && !isPortrait(thumb.width, thumb.height) ? '' : (thumb?.source || page.original?.source || '');
+  return {fullTitle:title, title:stripArticleQualifier(title), year:extractYearFromText(description) || extractYearFromText(qualifier) || extractYearFromText(extract), description:description || extract, posterUrl, pageUrl:'https://en.wikipedia.org/wiki/'+encodeURIComponent(title.replace(/ /g,'_')), page};
 }
 const TITLE_SMALL_WORDS = new Set(['a','an','the','and','but','or','nor','for','of','in','on','at','to','by','as','vs','with','from','into']);
 /* "SNOW WHITE AND THE SEVEN DWARFS" -> "Snow White and the Seven Dwarfs": article titles are case-sensitive after the first letter. */
@@ -626,24 +659,34 @@ function wikiTitleCase(text){
     return lower.replace(/(^|[-–/(])([a-z])/g, (m,p,c)=>p+c.toUpperCase());
   }).join(' ');
 }
+/* Page titles to look up in one batch. `form`: 'year' ("X (1995 film)"), 'qualified' ("X (film)") or 'bare' ("X"). `alt`: the same
+   title with "The" added or removed, which only counts when nothing exists under the title as the collection wrote it. */
 function wikiProbeTitles(ctx){
+  const K=WIKI_KINDS[ctx.kind];
   const out=[], seen=new Set();
-  const add=(title, qualified)=>{title=title.replace(/[|#<>\[\]{}]/g,' ').replace(/\s+/g,' ').trim(); if(title && !seen.has(title)){seen.add(title); out.push({title, qualified});}};   // characters not allowed in page titles (and "|" separates the batch)
+  const add=(title, form, alt)=>{title=title.replace(/[|#<>\[\]{}]/g,' ').replace(/\s+/g,' ').trim(); if(title && !seen.has(title)){seen.add(title); out.push({title, form, alt});}};   // characters not allowed in page titles (and "|" separates the batch)
   const years=[ctx.year, ctx.catalogYear].filter(Boolean);
   for(const variant of ctx.variants.slice(0,3)){
-    const bare=variant.replace(/^(?:the|a|an)\s+/i,'');
-    for(const form of new Set([variant, bare, /^(?:the|a|an)\s/i.test(variant) ? variant : 'The '+variant])){
+    const hasArticle=/^(?:the|a|an)\s/i.test(variant);
+    for(const [form, alt] of [[variant, false], [hasArticle ? variant.replace(/^(?:the|a|an)\s+/i,'') : 'The '+variant, true]]){
       for(const f of new Set(form===form.toUpperCase() ? [wikiTitleCase(form)] : [form, wikiTitleCase(form)])){
-        years.forEach(y=>add(`${f} (${y} film)`, true));
-        add(`${f} (film)`, true);
-        add(f, false);
+        years.forEach(y=>K.probes.forEach(k=>add(`${f} (${y} ${k})`, 'year', alt)));
+        K.probes.forEach(k=>add(`${f} (${k})`, 'qualified', alt));
+        add(f, 'bare', alt);
       }
     }
   }
   return out;
 }
-/* -> {status:'unique', film} | {status:'ambiguous'} | {status:'none'} */
+/* Which film (or series) is this title? -> {status:'unique', film} | {status:'ambiguous'} | {status:'none'}.
+   1. An explicit year in the title names the film (or nothing).
+   2. Wikipedia's own primary topic: the title as the collection wrote it has ONE "X (film)" article (a redirect to the most notable
+      "X (1995 film)" counts) -> that film, however many same-named films exist. "The X" / "X" variants of the title don't count.
+   3. "X (film)" is a disambiguation page, or several films answer to the title -> only a catalog year or a section hint may choose.
+   4. A bare "X" film article is the primary topic too. 5. Nothing under the typed title: the same title with "The" added/removed.
+   6. Nothing by exact lookup: Wikipedia's case-insensitive search, accepted only if it finds exactly one such film. */
 async function wikipediaIdentity(ctx){
+  const K=WIKI_KINDS[ctx.kind];
   const probes=wikiProbeTitles(ctx);
   const pages=[], redirects=new Map();
   for(let i=0;i<probes.length;i+=20){
@@ -653,42 +696,60 @@ async function wikipediaIdentity(ctx){
   }
   const byTitle=new Map(pages.map(p=>[p.title, p]));
   const resolve=t=>{for(let n=0;n<5 && redirects.has(t);n++) t=redirects.get(t); return byTitle.get(t);};
-  const films=new Map();
-  let filmFormDab=false, anyDab=false;   // filmFormDab: "X (film)" / "X (1999 film)" is a disambiguation page = several films share the title
-  const takeFilm=p=>{const info=wikiFilmInfo(p, ctx.wanted); if(info && !films.has(info.fullTitle)) films.set(info.fullTitle, info);};
+  const films=new Map();   // every matching film article seen, by page title
+  const found={typed:{qualified:[], bare:[]}, alt:{qualified:[], bare:[]}};
+  const dab={typed:false, alt:false};   // a disambiguation page stands where the "X (film)" article would be: several films share the title
+  let anyDab=false;
+  const take=page=>{const info=wikiFilmInfo(page, ctx.wanted, ctx.kind); if(info) films.set(info.fullTitle, info); return info;};
   for(const probe of probes){
     const page=resolve(probe.title);
     if(!page) continue;
+    const side=probe.alt ? 'alt' : 'typed';
     if(isDisambiguation(page)){
-      if(ctx.wanted.has(simpleText(stripArticleQualifier(page.title)))){anyDab=true; if(probe.qualified) filmFormDab=true;}
-    }else takeFilm(page);
-  }
-  const verdict=()=>wikiVerdict([...films.values()], ctx, filmFormDab, anyDab);
-  let result=verdict();
-  // Probes cannot see homonyms hiding under year-qualified titles ("Heat (1986 film)"): ask the case-insensitive search as well,
-  // unless an explicit year already pinned the film, or the "(film)" page is a disambiguation page and nothing can resolve it.
-  const settled=(ctx.year && result.status==='unique') || (result.status==='ambiguous' && filmFormDab && !ctx.catalogYear && !ctx.hint);
-  if(!settled){
-    for(const variant of ctx.variants.slice(0,2)){
-      const data=await wikiQuery({...WIKI_PAGE_PROPS, generator:'search', gsrsearch:`"${variant}" film`, gsrlimit:'20', gsrnamespace:'0'});
-      pagesFromWikiResponse(data).filter(p=>!p.missing && !isDisambiguation(p)).forEach(takeFilm);
+      if(ctx.wanted.has(simpleText(stripArticleQualifier(page.title)))){anyDab=true; if(probe.form!=='bare') dab[side]=true;}
+      continue;
     }
-    result=verdict();
+    const info=take(page);
+    if(info && probe.form!=='year') found[side][probe.form].push(info);
+  }
+  const searchFound=[];
+  const uniq=list=>[...new Map(list.map(f=>[f.fullTitle, f])).values()];
+  const unique=film=>({status:'unique', film});
+  const homonyms=()=>{   // several films share the title: only a catalog year or a section hint may choose between them
+    const all=[...films.values()];
+    if(ctx.catalogYear){const m=all.filter(f=>f.year===ctx.catalogYear); if(m.length===1) return unique(m[0]);}
+    if(ctx.hint){const m=all.filter(f=>SECTION_HINT_WORDS[ctx.hint].test(f.description)); if(m.length===1) return unique(m[0]);}
+    return {status:'ambiguous'};
+  };
+  const verdict=searched=>{
+    if(ctx.year){
+      const match=[...films.values()].filter(f=>f.year===ctx.year);
+      if(match.length===1) return unique(match[0]);
+      return {status: match.length>1 || films.size || anyDab ? 'ambiguous' : 'none'};
+    }
+    const primary=uniq(found.typed.qualified), bare=uniq(found.typed.bare);
+    if(primary.length===1 && !dab.typed && bare.every(f=>f.fullTitle===primary[0].fullTitle)) return unique(primary[0]);
+    if(primary.length || dab.typed || bare.length>1) return homonyms();
+    if(bare.length===1) return unique(bare[0]);
+    const alt=uniq([...found.alt.qualified, ...found.alt.bare]);
+    if(dab.alt || alt.length>1) return homonyms();
+    if(alt.length===1) return unique(alt[0]);
+    if(!searched) return {status:'none'};
+    const hits=uniq(searchFound);
+    if(hits.length===1) return unique(hits[0]);
+    return hits.length>1 ? homonyms() : {status: anyDab ? 'ambiguous' : 'none'};
+  };
+  let result=verdict(false);
+  // The search is case-insensitive and sees year-qualified titles: it finds films the exact lookups miss, and lists the homonyms
+  // a catalog year or section hint needs to choose from. An unresolvable disambiguation page needs no further evidence.
+  if(result.status==='none' || (ctx.year && result.status!=='unique') || (result.status==='ambiguous' && (ctx.hint || ctx.catalogYear))){
+    for(const variant of ctx.variants.slice(0,2)){
+      const data=await wikiQuery({...WIKI_PAGE_PROPS, generator:'search', gsrsearch:`"${variant}" ${K.search}`, gsrlimit:'20', gsrnamespace:'0'});
+      for(const page of pagesFromWikiResponse(data)) if(!page.missing && !isDisambiguation(page)){const info=take(page); if(info) searchFound.push(info);}
+    }
+    result=verdict(true);
   }
   return result;
-}
-function wikiVerdict(list, ctx, filmFormDab, anyDab){
-  if(ctx.year){   // the title itself names the year: that film or nothing
-    const match=list.filter(f=>f.year===ctx.year);
-    if(match.length===1) return {status:'unique', film:match[0]};
-    return {status: match.length>1 || list.length || anyDab ? 'ambiguous' : 'none'};
-  }
-  if(!list.length) return {status: anyDab ? 'ambiguous' : 'none'};
-  if(list.length===1 && !filmFormDab) return {status:'unique', film:list[0]};
-  // Several films share the title. Only a catalog year or a section hint may choose between them.
-  if(ctx.catalogYear){const m=list.filter(f=>f.year===ctx.catalogYear); if(m.length===1) return {status:'unique', film:m[0]};}
-  if(ctx.hint){const m=list.filter(f=>SECTION_HINT_WORDS[ctx.hint].test(f.description)); if(m.length===1) return {status:'unique', film:m[0]};}
-  return {status:'ambiguous'};
 }
 
 /* ---------- Manual picker candidates (permissive: the user decides) ---------- */
