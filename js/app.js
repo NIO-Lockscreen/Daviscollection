@@ -37,6 +37,7 @@ function init(){
   els.barcodeLookupBtn.addEventListener('click',()=>lookupBarcode(els.newBarcode.value.trim(), true));
   els.startScanBtn.addEventListener('click',startScanner);
   els.stopScanBtn.addEventListener('click',stopScanner);
+  initScanner();
   els.backupMenuBtn.addEventListener('click',()=>toggleBackupMenu());
   document.addEventListener('click',e=>{if(!e.target.closest('.backupWrap')) closeBackupMenu();});
   els.exportJsonBtn.addEventListener('click',()=>{exportJson(); closeBackupMenu();});
