@@ -25,7 +25,7 @@
   td.img{width:64px}
   td.img img{width:56px;aspect-ratio:2/3;object-fit:cover;border-radius:6px;background:var(--panel);display:block}
   .v{font-weight:700;font-size:.8rem;white-space:nowrap}
-  .CORRECT{color:var(--good)}.WRONG{color:var(--bad)}.RISKY{color:var(--warn)}.MISS,.SAFE_NONE{color:var(--muted)}
+  .CORRECT{color:var(--good)}.WRONG,.NOT_POSTER{color:var(--bad)}.RISKY{color:var(--warn)}.MISS,.SAFE_NONE{color:var(--muted)}
   .muted{color:var(--muted);font-size:.85rem}
   @media (max-width:640px){td.exp{display:none}}
 </style>
@@ -42,6 +42,7 @@
   <div class="summary" id="summary"></div>
   <div class="filters" id="filters" hidden>
     <label><input type="checkbox" value="WRONG" checked> Wrong</label>
+    <label><input type="checkbox" value="NOT_POSTER" checked> Not a poster</label>
     <label><input type="checkbox" value="RISKY" checked> Risky</label>
     <label><input type="checkbox" value="CORRECT" checked> Correct</label>
     <label><input type="checkbox" value="MISS" checked> No cover</label>
@@ -59,7 +60,17 @@
 <script src="../../js/covers.js"></script>
 <script src="judge.js"></script>
 <script>
-const LABEL={CORRECT:'Correct',WRONG:'Wrong film',RISKY:'Risky guess',MISS:'No cover',SAFE_NONE:'Correctly skipped'};
+const LABEL={CORRECT:'Correct',WRONG:'Wrong film',NOT_POSTER:'Not a poster',RISKY:'Risky guess',MISS:'No cover',SAFE_NONE:'Correctly skipped'};
+// Natural size of the cover image, so photos/logos/title cards (not portrait) can be told apart from posters.
+function imageSize(url, ms=15000){
+  return new Promise(resolve=>{
+    if(!url) return resolve(null);
+    const img=new Image(); const t=setTimeout(()=>resolve(null),ms);
+    img.onload=()=>{clearTimeout(t); resolve({w:img.naturalWidth,h:img.naturalHeight});};
+    img.onerror=()=>{clearTimeout(t); resolve(null);};
+    img.src=url;
+  });
+}
 let results=[];
 // The exact automatic decision when available; older builds only had lookupSmartCover.
 async function autoCover(e){
@@ -75,7 +86,8 @@ async function runAudit({concurrency=2, onRow}={}){
       const entry=queue.shift();
       let result=null, error='';
       try{ result=await autoCover(entry); }catch(err){ error=String(err && err.message || err); }
-      const r={entry, result:result && {posterUrl:result.posterUrl, provider:result.provider, title:result.title, year:result.year, confidence:result.confidence, pageUrl:result.pageUrl}, error, verdict:CoverAudit.judge(entry,result)};
+      const dims=result && result.posterUrl ? await imageSize(result.posterUrl) : null;
+      const r={entry, result:result && {posterUrl:result.posterUrl, provider:result.provider, title:result.title, year:result.year, confidence:result.confidence, pageUrl:result.pageUrl}, dims, error, verdict:CoverAudit.judge(entry,result,dims)};
       rows.push(r); onRow && onRow(r, rows.length, gt.entries.length);
     }
   }
@@ -95,7 +107,7 @@ function rowHtml(r){
 }
 function showSummary(s){
   const pct=v=>v==null?'—':Math.round(v*100)+'%';
-  document.getElementById('summary').innerHTML=[['Right film when a cover is set',pct(s.precision)],['Clear-cut titles with right cover',pct(s.coverage)],['Correct',s.CORRECT],['Wrong film',s.WRONG],['Risky guesses',s.RISKY],['No cover',s.MISS],['Correctly skipped',s.SAFE_NONE]]
+  document.getElementById('summary').innerHTML=[['Right film when a cover is set',pct(s.precision)],['Clear-cut titles with right cover',pct(s.coverage)],['Correct',s.CORRECT],['Wrong film',s.WRONG],['Not a poster',s.NOT_POSTER],['Risky guesses',s.RISKY],['No cover',s.MISS],['Correctly skipped',s.SAFE_NONE]]
     .map(([k,v])=>`<div><small>${k}</small><strong>${v}</strong></div>`).join('');
 }
 document.getElementById('runBtn').addEventListener('click',async()=>{
