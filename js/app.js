@@ -81,6 +81,7 @@ function init(){
   if (window.matchMedia('(max-width: 720px)').matches) showScreen('add');
   renderFresh();
   updateBlueprintPreview();
+  offerOldCoverCheck();
 }
 
 function escapeHtml(str=''){return String(str).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -165,7 +166,7 @@ function getFiltered(dupes=getDuplicateMap()){
     if(sort==='title-desc') return b.title.localeCompare(a.title);
     if(sort==='added-desc') return (b.added||'').localeCompare(a.added||'') || b.id.localeCompare(a.id);
     if(sort==='unseen-first') return ((a.seen===false?0:1)-(b.seen===false?0:1)) || a.title.localeCompare(b.title);
-    if(sort==='auto-first') return ((b.posterSource==='auto')-(a.posterSource==='auto')) || a.title.localeCompare(b.title);
+    if(sort==='auto-first') return (coverReviewRank(a)-coverReviewRank(b)) || a.title.localeCompare(b.title);   // "Covers to review first": check, auto, old version, the rest (value kept from "Auto covers first")
     if(sort==='dupes-first') return ((dupes[titleKey(b.title)]||0)-(dupes[titleKey(a.title)]||0)) || a.title.localeCompare(b.title);
     return a.title.localeCompare(b.title);
   });
@@ -225,6 +226,7 @@ function onGridClick(e){
   else if(d.searchposter) quickPosterLookup(d.searchposter);
   else if(d.removePoster) removePoster(d.removePoster);
   else if(d.wrongCover) wrongCover(d.wrongCover);
+  else if(d.keepCover) keepCover(d.keepCover);
   else if(d.place) openShelfPicker([d.place]);
 }
 
@@ -301,6 +303,7 @@ function cardHtml(m, dupeCount){
   const barcode = m.barcode ? `<span class="chip">${escapeHtml(m.barcode)}</span>` : '';
   const seenChip = m.seen===false ? '<span class="chip unseenPill">Not seen</span>' : '<span class="chip seenPill">Seen</span>';
   const removedChip = (!m.poster && m.posterRemoved===true) ? '<span class="chip posterRemovedPill">Poster removed</span>' : '';
+  const checkChip = coverChipHtml(m);
   const seenBtn = m.seen===false ? 'Mark seen' : 'Mark unseen';
   const needsPoster = !m.poster && m.posterRemoved!==true;
   const isSel = selectMode && selected.has(m.id);
@@ -309,18 +312,18 @@ function cardHtml(m, dupeCount){
   const placeBtn = m.section===UNSORTED_SECTION ? `<button class="miniBtn placeBtn" data-place="${id}">Place on shelf</button>` : '';
   if(compact){
     return `<article class="${cls}" data-id="${id}" data-needs-poster="${needsPoster?'true':'false'}" style="--hue:${hue}">${selBox}
-      <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${seenChip}${removedChip}${dupe}${barcode}</div><div class="formatBadge">${escapeHtml(m.format)}</div>${placeBtn}</div>
+      <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${checkChip}${seenChip}${removedChip}${dupe}${barcode}</div><div class="formatBadge">${escapeHtml(m.format)}</div>${placeBtn}</div>
     </article>`;
   }
   const img = m.poster ? `<img src="${escapeHtml(m.poster)}" alt="Cover for ${escapeHtml(m.title)}" loading="lazy" onerror="this.remove()">` : '';
   const posterBtn = m.poster
     ? `<button class="miniBtn" data-remove-poster="${id}">Remove poster</button>`
     : `<button class="miniBtn" data-searchposter="${id}">${m.posterRemoved===true?'Choose poster':'Find poster'}</button>`;
-  const wrongBtn = m.poster && m.posterSource==='auto' ? `<button class="miniBtn wrongBtn" data-wrong-cover="${id}">Wrong cover?</button>` : '';
-  const extra = placeBtn || wrongBtn ? `<div class="cardExtra">${placeBtn}${wrongBtn}</div>` : '';
+  const coverBtns = coverButtonsHtml(m);   // Keep (flagged covers) and Wrong cover? (automatic, flagged and old-version covers), see covers.js
+  const extra = placeBtn || coverBtns ? `<div class="cardExtra">${placeBtn}${coverBtns}</div>` : '';
   return `<article class="${cls}" data-id="${id}" data-needs-poster="${needsPoster?'true':'false'}" style="--hue:${hue}">${selBox}
     <div class="cover">${img}<div class="coverTitle">${escapeHtml(shortCoverTitle(m.title))}</div><div class="formatBadge">${escapeHtml(m.format)}</div></div>
-    <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${seenChip}${removedChip}${dupe}${barcode}</div>${m.notes?`<div class="notes">${escapeHtml(m.notes)}</div>`:''}<div class="cardActions"><button class="miniBtn" data-toggle-seen="${id}">${seenBtn}</button><button class="miniBtn" data-edit="${id}">Edit</button>${posterBtn}</div>${extra}</div>
+    <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${checkChip}${seenChip}${removedChip}${dupe}${barcode}</div>${m.notes?`<div class="notes">${escapeHtml(m.notes)}</div>`:''}<div class="cardActions"><button class="miniBtn" data-toggle-seen="${id}">${seenBtn}</button><button class="miniBtn" data-edit="${id}">Edit</button>${posterBtn}</div>${extra}</div>
   </article>`;
 }
 function shortCoverTitle(t){return t.length>52 ? t.slice(0,49)+'…' : t}
@@ -380,6 +383,7 @@ function saveEdit(){
   const nextPoster = els.editPoster.value.trim();
   m.title=title; m.section=getSectionFromForm('edit'); m.format=els.editFormat.value; m.barcode=els.editBarcode.value.trim(); m.seen=!!els.editSeen.checked; m.poster=nextPoster; m.posterRemoved=nextPoster ? false : !!(oldPoster || m.posterRemoved); m.notes=els.editNotes.value.trim(); m.updated=today();
   if(!nextPoster) delete m.posterSource; else if(nextPoster!==oldPoster) m.posterSource='manual';   // picked or pasted by the user (a kept auto cover stays 'auto')
+  if(nextPoster!==oldPoster) delete m.posterSuggestion;   // a different cover makes the old suggestion moot
   save(); populateSelects(); render(); closeModal(); toast('Saved changes.');
 }
 function deleteEditingMovie(){

@@ -26,6 +26,13 @@ let itunesUseJsonp = false;       // set once fetch() to iTunes failed with a ne
 let tmdbRejected = false;         // TMDB answered 401 this session: skip it until the key changes
 let coverBulk = null;             // running "Load missing covers" job
 let coverBulkSummary = '';
+const coverCheckQueue = [];       // "Check old covers": served after visible cards and the bulk load
+const COVER_CHECK_BATCH = 25;     // results are saved in batches of this many, not once per movie
+const COVER_CHECK_OFFLINE_STREAK = 12;   // this many network errors in a row (no answer in between) stop the check
+let coverCheck = null;            // running "Check old covers" job
+let coverCheckSummary = '';
+let coverCheckDirty = 0;          // checked movies not saved yet
+let oldCoverHintShown = false;
 
 function initCovers(){
   purgeStaleCoverCache();
@@ -74,6 +81,8 @@ function setupCoverSettingsUi(){
     toast(`Cover cache cleared (${n} entr${n===1?'y':'ies'}). Retrying missing covers…`);
   });
   $('coverBulkBtn').addEventListener('click', toggleBulkCovers);
+  $('coverCheckBtn')?.addEventListener('click', toggleCoverCheck);
+  window.addEventListener('pagehide', flushCoverCheck);
   // initCovers() runs before app.js registers its own Escape handler, so Escape closes only this dialog when it is on top.
   window.addEventListener('keydown', e=>{
     if(e.key==='Escape' && modal.classList.contains('active')){e.stopImmediatePropagation(); closeCoverSettings();}
@@ -89,6 +98,7 @@ function openCoverSettings(){
   select.innerHTML=Object.entries(countries).map(([code,name])=>`<option value="${escapeHtml(code)}">${escapeHtml(code===name?code:code+' — '+name)}</option>`).join('');
   select.value=current;
   updateBulkUi();
+  updateCheckUi();
   modal.classList.add('active');
 }
 function closeCoverSettings(){$('coverSettingsModal')?.classList.remove('active');}
@@ -183,17 +193,144 @@ function updateBulkUi(){
   }
 }
 
+/* ---------- Covers from the old version: check them, never overwrite them ----------
+   The old app picked covers automatically and left no posterSource, so a wrong automatic cover and a cover the user chose look
+   alike (poster set, no posterSource = "legacy"). "Check old covers" looks each one up again with findAutoCover() through the
+   same queue (concurrency limit, 429 pause): the same poster is marked verified ('auto'); anything else only FLAGS the card
+   ('check') and keeps the stored poster, with the other poster in posterSuggestion. Only the user's "Wrong cover?" replaces one. */
+function isLegacyCover(m){return !!m && !!m.poster && !m.posterSource;}
+function legacyCoverIds(){return state.movies.filter(isLegacyCover).map(m=>m.id);}
+/* Sort rank of "Covers to review first": check, auto, legacy, then the rest. */
+function coverReviewRank(m){return m.posterSource==='check' ? 0 : m.posterSource==='auto' ? 1 : isLegacyCover(m) ? 2 : 3;}
+/* The same picture, whatever size the URL asks for (coverUrlKey ignores iTunes sizes; Wikimedia thumbnail widths and TMDB sizes are ignored here too). */
+function coverSameImage(a, b){
+  const flat=u=>coverUrlKey(u).replace(/\/\d+px-/,'/Npx-').replace(/\/t\/p\/(?:w\d+|original)\//,'/t/p/S/');
+  return coverUrlKey(a)===coverUrlKey(b) || flat(a)===flat(b);
+}
+function toggleCoverCheck(){
+  if(coverCheck){cancelCoverCheck(); return;}
+  const ids=legacyCoverIds();
+  if(!ids.length){updateCheckUi(); return;}
+  coverCheckSummary='';
+  coverCheck={ids:new Set(ids), total:ids.length, confirmed:0, review:0, errors:0, streak:0, timer:setInterval(updateCheckUi, 500)};
+  coverCheckQueue.push(...ids);
+  updateCheckUi();
+  pumpAutoCoverQueue();
+}
+function cancelCoverCheck(){if(coverCheck) finishCoverCheck('cancelled');}
+/* Returns 'confirmed' | 'review' | 'error' | 'skipped' | 'requeued'. Only a lookup that gave an answer changes the movie; a thrown error leaves it for a later run. */
+async function checkLegacyCover(id){
+  const job=coverCheck, movie=state.movies.find(m=>m.id===id);
+  if(!job || !isLegacyCover(movie)) return 'skipped';
+  const poster=movie.poster;
+  let result;
+  try{result=await findAutoCover(movie, {useCache:true});}
+  catch(e){
+    if(e?.kind==='ratelimit' && coverCheck===job){coverCheckQueue.unshift(id); return 'requeued';}   // the 429 already paused the queue
+    return 'error';
+  }
+  const m=state.movies.find(x=>x.id===id);
+  if(coverCheck!==job || !isLegacyCover(m) || m.poster!==poster) return 'skipped';   // cancelled, or the user changed this cover meanwhile
+  if(result?.posterUrl && coverSameImage(result.posterUrl, poster)){m.posterSource='auto'; delete m.posterSuggestion;}
+  else{
+    m.posterSource='check';
+    if(result?.posterUrl) m.posterSuggestion=result.posterUrl; else delete m.posterSuggestion;
+  }
+  syncCardCoverFlags(id);
+  if(++coverCheckDirty>=COVER_CHECK_BATCH) flushCoverCheck();
+  return m.posterSource==='auto' ? 'confirmed' : 'review';
+}
+function noteCoverCheck(id, outcome){
+  const job=coverCheck;
+  if(!job || !job.ids.delete(id)) return;
+  if(outcome==='confirmed') job.confirmed++;
+  else if(outcome==='review') job.review++;
+  else if(outcome==='error') job.errors++;
+  if(outcome==='error') job.streak++; else if(outcome!=='skipped') job.streak=0;
+  if(job.streak>=COVER_CHECK_OFFLINE_STREAK) finishCoverCheck('offline');
+  else if(job.ids.size) updateCheckUi();
+  else finishCoverCheck('done');
+}
+function flushCoverCheck(){
+  if(!coverCheckDirty) return;
+  if(save()) coverCheckDirty=0;
+}
+function finishCoverCheck(how){
+  const job=coverCheck;
+  clearInterval(job.timer);
+  coverCheck=null;
+  coverCheckQueue.length=0;
+  flushCoverCheck();
+  const n=v=>v.toLocaleString();
+  coverCheckSummary=(how==='cancelled' ? 'Stopped. ' : how==='offline' ? 'Stopped: the cover services could not be reached. ' : '')
+    +`${n(job.confirmed+job.review)} checked: ${n(job.confirmed)} confirmed, ${n(job.review)} need a look`
+    +(job.errors ? `, ${n(job.errors)} could not be checked (run it again to retry them)` : '')+'.';
+  updateCheckUi();
+  toast(coverCheckSummary, 6000);
+  if(typeof els!=='undefined' && els.sortSelect?.value==='auto-first') render();   // the review order may have changed
+}
+function updateCheckUi(){
+  const btn=$('coverCheckBtn'), status=$('coverCheckStatus'), bar=$('coverCheckProgress');
+  if(!btn || !status) return;
+  if(coverCheck){
+    const j=coverCheck, done=j.total-j.ids.size, wait=autoCoverPausedUntil-Date.now();
+    btn.disabled=false; btn.textContent='Cancel check';
+    bar.hidden=false; bar.max=j.total; bar.value=done;
+    status.textContent=`${done.toLocaleString()} of ${j.total.toLocaleString()} checked · ${j.confirmed.toLocaleString()} confirmed · ${j.review.toLocaleString()} need a look`+(j.errors?` · ${j.errors} could not be checked`:'')+(wait>0?` · paused ${Math.ceil(wait/1000)} s (rate limit)`:'');
+  }else{
+    const left=legacyCoverIds().length;
+    btn.textContent='Check old covers';
+    btn.disabled=!left;
+    bar.hidden=true;
+    status.textContent=[coverCheckSummary,
+      left ? `${left.toLocaleString()} cover${left===1?'':'s'} from an older version ${left===1?"hasn't":"haven't"} been checked.` : (coverCheckSummary ? '' : 'No covers from an older version are waiting to be checked.')
+    ].filter(Boolean).join(' ');
+  }
+}
+/* At startup: one gentle toast per session when legacy covers exist. It only opens Cover settings: the check itself makes hundreds of requests, so the user starts it. */
+function offerOldCoverCheck(){
+  const attempt=tries=>{
+    if(oldCoverHintShown || typeof toast!=='function' || !legacyCoverIds().length) return;
+    if(Date.now()<(toast._hold||0)){if(tries<6) setTimeout(()=>attempt(tries+1), 3000); return;}   // never bury a warning or an Undo toast
+    oldCoverHintShown=true;
+    toast('Some covers came from the old version and may be wrong.', 12000, {warn:false, action:{label:'Check them', fn:openCoverSettings}});
+  };
+  setTimeout(()=>attempt(0), 2500);
+}
+/* "Keep" on a flagged card: the user confirms the cover, so it counts as chosen by them. */
+function keepCover(id){
+  const m=state.movies.find(x=>x.id===id);
+  if(!m || !m.poster) return;
+  m.posterSource='manual'; delete m.posterSuggestion;
+  m.updated=today();
+  save();
+  syncCardCoverFlags(id);
+  updateCheckUi();
+  toast('Cover kept.');
+}
+/* The "Check cover" chip and the Keep / Wrong cover? buttons are drawn from the movie's state, both by cardHtml (app.js) and by syncCardCoverFlags. */
+function coverChipHtml(m){
+  return m.poster && m.posterSource==='check' ? '<span class="chip checkPill" title="This cover came from an older version and may be the wrong film">Check cover</span>' : '';
+}
+function coverButtonsHtml(m){
+  if(!m.poster) return '';
+  const id=escapeHtml(m.id), s=m.posterSource;
+  return (s==='check' ? `<button class="miniBtn keepBtn" data-keep-cover="${id}">Keep</button>` : '')
+    + (!s || s==='auto' || s==='check' ? `<button class="miniBtn wrongBtn" data-wrong-cover="${id}">Wrong cover?</button>` : '');   // not on covers the user chose
+}
+
 /* ---------- Poster picker (manual cover selection) ---------- */
-async function quickPosterLookup(id){
+async function quickPosterLookup(id, opts={}){
   const m=state.movies.find(x=>x.id===id); if(!m) return;
   openPosterPicker({
     title: m.title,
     section: m.section,
     format: m.format,
+    suggestion: opts.suggestion,
     onSelect: poster => {
       if(m.poster && m.poster!==poster) rejectCover(m.title, m.poster);
       unrejectCover(m.title, poster);
-      m.poster=poster; m.posterSource='manual'; m.posterRemoved=false; m.updated=today(); save();
+      m.poster=poster; m.posterSource='manual'; delete m.posterSuggestion; m.posterRemoved=false; m.updated=today(); save();
       updateCardPoster(id, poster, m.title);
       toast('Cover added.');
     }
@@ -222,6 +359,7 @@ function openPosterPicker(opts){
     title: opts.title,
     section: opts.section || '',
     format: opts.format || '',
+    suggestion: opts.suggestion || '',   // a poster findAutoCover() proposed earlier (see "Check old covers"): listed first
     onSelect: opts.onSelect,
     generation: 0
   };
@@ -254,16 +392,18 @@ async function refreshPickerCandidates(searchTerm){
   const gen = ++posterPickerState.generation;
   const state0 = posterPickerState;
   const warnings = [];
+  const suggested = state0.suggestion ? [{url:state0.suggestion, source:'Suggested', label:'Suggested match', suggested:true}] : [];
   els.pickerStatus.textContent = 'Searching candidates…';
   els.pickerGrid.innerHTML = '';
+  if(suggested.length){renderPickerCandidates(suggested); els.pickerStatus.textContent = 'Suggested match shown first. Searching for more…';}   // no waiting for the network
   try{
     const candidates = await gatherPosterCandidates(searchTerm || state0.title, {section:state0.section, format:state0.format, originalTitle: state0.title, warn:(name,e)=>warnings.push(coverWarning(name,e))});
     if(!posterPickerState || posterPickerState.generation !== gen) return; // picker was closed or re-searched
-    renderPickerCandidates(candidates, [...new Set(warnings)]);
+    renderPickerCandidates([...suggested, ...candidates.filter(c=>!suggested.some(sg=>coverUrlKey(sg.url)===coverUrlKey(c.url)))], [...new Set(warnings)]);
   }catch(e){
     if(!posterPickerState || posterPickerState.generation !== gen) return;
     els.pickerStatus.textContent = 'Search failed. Try a different term, or paste a URL below.';
-    els.pickerGrid.innerHTML = '';
+    if(!suggested.length) els.pickerGrid.innerHTML = '';
   }
 }
 function coverWarning(name, e){
@@ -283,7 +423,7 @@ function renderPickerCandidates(candidates, warnings=[]){
   }
   els.pickerStatus.textContent = `${candidates.length} candidate${candidates.length===1?'':'s'} — tap one to use it.`+note;
   els.pickerGrid.innerHTML = candidates.map((c,i)=>`
-    <button class="pickerThumb${c.rejected?' rejected':''}" data-pickerpick="${i}" title="${escapeHtml(c.rejected?'Rejected before for this title. '+(c.label||''):(c.label||''))}">
+    <button class="pickerThumb${c.rejected?' rejected':''}${c.suggested?' suggested':''}"data-pickerpick="${i}" title="${escapeHtml(c.rejected?'Rejected before for this title. '+(c.label||''):(c.label||''))}">
       <img src="${escapeHtml(c.url)}" alt="${escapeHtml(c.label||'Candidate')}" loading="lazy" onerror="this.closest('.pickerThumb').style.display='none'">
       <span class="src">${escapeHtml(c.source)}${c.year?(' · '+c.year):''}${c.rejected?' · rejected':''}</span>
       ${c.label?`<span class="nm">${escapeHtml(c.label)}</span>`:''}
@@ -331,12 +471,13 @@ function requeueAutoCover(id){
   (coverBulk?.ids.has(id) ? autoCoverBulkQueue : autoCoverQueue).unshift(id);
 }
 function pumpAutoCoverQueue(){
-  while(Date.now()>=autoCoverPausedUntil && autoCoverRunning.size < AUTO_COVER_CONCURRENCY && (autoCoverQueue.length || autoCoverBulkQueue.length)){
-    const id=autoCoverQueue.length ? autoCoverQueue.shift() : autoCoverBulkQueue.shift();
+  while(Date.now()>=autoCoverPausedUntil && autoCoverRunning.size < AUTO_COVER_CONCURRENCY && (autoCoverQueue.length || autoCoverBulkQueue.length || coverCheckQueue.length)){
+    const check=!autoCoverQueue.length && !autoCoverBulkQueue.length;   // old-cover checks are served last
+    const id=autoCoverQueue.length ? autoCoverQueue.shift() : autoCoverBulkQueue.length ? autoCoverBulkQueue.shift() : coverCheckQueue.shift();
     autoCoverQueued.delete(id);
     autoCoverRunning.add(id);
-    autoLoadVisibleCover(id)
-      .then(outcome=>{if(outcome!=='requeued') bulkNote(id, outcome==='found');}, ()=>bulkNote(id, false))
+    (check ? checkLegacyCover(id) : autoLoadVisibleCover(id))
+      .then(outcome=>{if(outcome!=='requeued') check ? noteCoverCheck(id, outcome) : bulkNote(id, outcome==='found');}, ()=>check ? noteCoverCheck(id, 'error') : bulkNote(id, false))
       .finally(()=>{
         autoCoverRunning.delete(id);
         pumpAutoCoverQueue();
@@ -361,7 +502,7 @@ async function autoLoadVisibleCover(id){
     if(!result?.posterUrl){autoCoverFailedSession.add(id); return 'none';}
     const m=state.movies.find(x=>x.id===id);
     if(!m || m.poster || m.posterRemoved===true) return 'skipped';
-    m.poster=result.posterUrl; m.posterSource='auto'; m.posterRemoved=false; m.updated=today();
+    m.poster=result.posterUrl; m.posterSource='auto'; delete m.posterSuggestion; m.posterRemoved=false; m.updated=today();
     save();
     updateCardPoster(id, result.posterUrl, m.title);
     return 'found';
@@ -1275,12 +1416,18 @@ function cardPosterButton(id, hasPoster){
   }
   return btn;
 }
-function cardWrongCoverButton(id){
-  const btn=document.createElement('button');
-  btn.className='miniBtn wrongBtn';
-  btn.dataset.wrongCover=id;
-  btn.textContent='Wrong cover?';
-  return btn;
+/* Redraws one card's "Check cover" chip and Keep / Wrong cover? buttons from the movie's current state (no full render). */
+function syncCardCoverFlags(id){
+  const card=cardById(id), m=state.movies.find(x=>x.id===id);
+  if(!card || !m) return;
+  card.querySelectorAll('.checkPill, [data-keep-cover], [data-wrong-cover]').forEach(n=>n.remove());
+  const chip=coverChipHtml(m), buttons=coverButtonsHtml(m), actions=card.querySelector('.cardActions');
+  if(chip) card.querySelector('.meta .chip')?.insertAdjacentHTML('afterend', chip);
+  if(buttons && actions){
+    let extra=card.querySelector('.cardExtra');
+    if(!extra){extra=document.createElement('div'); extra.className='cardExtra'; actions.after(extra);}
+    extra.insertAdjacentHTML('beforeend', buttons);
+  }
 }
 function updateCardPoster(id,poster,title){
   const card=cardById(id);
@@ -1298,18 +1445,13 @@ function updateCardPoster(id,poster,title){
   const actions=card.querySelector('.cardActions');
   if(findBtn) findBtn.replaceWith(cardPosterButton(id,true));
   else if(actions && !actions.querySelector('[data-remove-poster]')) actions.appendChild(cardPosterButton(id,true));
-  card.querySelectorAll('[data-wrong-cover]').forEach(b=>b.remove());
-  if(actions && state.movies.find(x=>x.id===id)?.posterSource==='auto'){   // only automatic covers can be flagged as wrong
-    let extra=card.querySelector('.cardExtra');
-    if(!extra){extra=document.createElement('div'); extra.className='cardExtra'; actions.after(extra);}
-    extra.appendChild(cardWrongCoverButton(id));
-  }
+  syncCardCoverFlags(id);   // "Check cover" / Keep / Wrong cover? depend on where the cover came from
 }
 function removePoster(id, opts={}){
   const m=state.movies.find(x=>x.id===id); if(!m) return;
   if(!m.poster && m.posterRemoved===true){toast('Poster is already removed for this title.'); return;}
   if(m.poster) rejectCover(m.title, m.poster);   // also drops the title's cache entry: a wrong auto match must not come back from the cache
-  m.poster=''; delete m.posterSource;
+  m.poster=''; delete m.posterSource; delete m.posterSuggestion;
   m.posterRemoved=true;
   m.updated=today();
   autoCoverQueued.delete(id);
@@ -1322,18 +1464,20 @@ function removePoster(id, opts={}){
   render();
   toast('Poster removed. Auto cover loading is disabled for this title.');
 }
-/* "Wrong cover?" on a card with an automatic cover: blacklist that URL (and its cache entry) like removePoster does, then open the picker for a replacement. */
+/* "Wrong cover?" on a card with an automatic, flagged or old-version cover: blacklist that URL (and its cache entry) like removePoster does, then open the picker for a replacement.
+   A suggestion stored by "Check old covers" goes into the picker, where it is listed first. */
 function wrongCover(id){
   const m=state.movies.find(x=>x.id===id); if(!m || !m.poster) return;
+  const suggestion=m.posterSuggestion || '';
   rejectCover(m.title, m.poster);
-  m.poster=''; delete m.posterSource;
+  m.poster=''; delete m.posterSource; delete m.posterSuggestion;
   m.posterRemoved=true;   // like removePoster: no automatic retry; the picker (or "Choose poster" later) picks the replacement
   m.updated=today();
   autoCoverQueued.delete(id);
   autoCoverFailedSession.add(id);
   save();
   render();
-  quickPosterLookup(id);
+  quickPosterLookup(id, {suggestion});
 }
 /* A saved poster that no longer loads would leave a blank gradient card (its title is hidden while a poster is set).
    Reset the card to "needs poster" state instead, and forget the dead URL. */
@@ -1344,7 +1488,7 @@ function onCoverImageError(e){
   const m=id && state.movies.find(x=>x.id===id);
   if(!m || !m.poster || img.getAttribute('src')!==m.poster) return;   // ignore stale events from a src that was already replaced
   rejectCover(m.title, m.poster);   // blacklists the dead URL and deletes this title's cache entries
-  m.poster=''; delete m.posterSource;   // posterRemoved stays as it was: this is not a user decision
+  m.poster=''; delete m.posterSource; delete m.posterSuggestion;   // posterRemoved stays as it was: this is not a user decision
   m.updated=today();
   autoCoverQueued.delete(id);
   autoCoverFailedSession.add(id);   // do not retry in a loop this session
@@ -1353,5 +1497,5 @@ function onCoverImageError(e){
   card.querySelectorAll('.cover img').forEach(i=>i.remove());
   markCardLoading(id,false);
   card.querySelector('[data-remove-poster]')?.replaceWith(cardPosterButton(id,false));
-  card.querySelectorAll('[data-wrong-cover]').forEach(b=>b.remove());
+  syncCardCoverFlags(id);
 }
