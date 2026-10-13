@@ -112,7 +112,7 @@ h1{margin:0;font-size:clamp(2rem,4vw,4.7rem);letter-spacing:-.07em;line-height:.
 .stat .micro{display:block;margin-top:6px;color:var(--muted);font-size:.75rem;letter-spacing:0;text-transform:none;font-weight:600}
 .controls{
   display:grid;
-  grid-template-columns:minmax(220px,2fr) minmax(160px,1fr) minmax(145px,1fr) minmax(140px,1fr) minmax(150px,1fr) auto auto;
+  grid-template-columns:minmax(200px,2fr) minmax(150px,1fr) minmax(135px,1fr) minmax(135px,1fr) minmax(165px,1fr) auto auto;
   gap:12px;
   padding:14px;
   border:1px solid var(--line);
@@ -343,3 +343,83 @@ video{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
 .pickerThumb.rejected:hover{opacity:.85}
 .pickerEmptyActions{display:flex;justify-content:center;margin:12px 0}
 @media (max-width:720px){.coverSmallBtn .lbl{display:none}}
+
+/* ---------- speed: incremental rendering ---------- */
+[hidden]{display:none!important}
+.gridSentinel{height:1px}
+.movieGrid:not(.compact) .card{content-visibility:auto;contain-intrinsic-size:auto 520px}   /* skip layout/paint of cards that are off screen; the browser remembers each card's real height once seen */
+
+/* ---------- card actions: place on shelf, wrong cover ---------- */
+.cardActions{flex-wrap:wrap}
+.cardExtra{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px}
+.cardExtra:empty{display:none}
+.cardExtra .miniBtn{flex:1 1 auto}
+.placeBtn{background:linear-gradient(135deg, rgba(125,211,252,.22), rgba(192,132,252,.22));border-color:rgba(125,211,252,.45);font-weight:700}
+.wrongBtn{color:var(--warn);border-color:rgba(253,230,138,.3);background:rgba(253,230,138,.07)}
+.movieGrid.compact .placeBtn{grid-column:3;grid-row:1;white-space:nowrap;padding:5px 10px;font-size:.76rem}
+
+/* ---------- select mode ---------- */
+input.selBox{color-scheme:dark;position:absolute;top:16px;left:16px;z-index:4;width:26px;height:26px;margin:0;padding:0;border-radius:6px;accent-color:#7dd3fc;cursor:pointer}
+.movieGrid.selecting .card{cursor:pointer}
+.movieGrid.selecting .cardActions,.movieGrid.selecting .cardExtra,.movieGrid.selecting .placeBtn{display:none}
+.card.selected{border-color:rgba(125,211,252,.85);box-shadow:0 0 0 2px rgba(125,211,252,.65), 0 18px 50px rgba(0,0,0,.24)}
+.movieGrid.compact input.selBox{position:static;width:20px;height:20px;grid-column:1}
+.movieGrid.compact.selecting .card:before{display:none}
+.movieGrid.compact .card.selected{background:rgba(125,211,252,.12);box-shadow:none}
+#selectToggle.toggled{background:linear-gradient(135deg, rgba(125,211,252,.22), rgba(192,132,252,.22));border-color:rgba(125,211,252,.6)}
+.selectBar{position:fixed;left:0;right:0;bottom:0;z-index:20;padding:10px 12px calc(10px + env(safe-area-inset-bottom, 0px));background:rgba(16,21,39,.97);border-top:1px solid var(--line);box-shadow:0 -18px 50px rgba(0,0,0,.4);backdrop-filter:blur(22px)}
+.selectBarInner{max-width:1180px;margin:0 auto;display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.selectCount{font-weight:800;margin-right:auto;white-space:nowrap}
+.selectBar button{padding:9px 14px;font-size:.88rem;white-space:nowrap}
+.selectBar button:disabled{opacity:.45;cursor:default;transform:none}
+body.selecting .app{padding-bottom:110px}
+body.selecting .toast{bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
+
+/* ---------- shelf picker, toast action, inline notes, clear filters ---------- */
+.shelfCard{width:min(460px,100%)}
+.shelfWhat{margin:0 0 14px;color:var(--soft);line-height:1.4;overflow-wrap:anywhere}
+.actions button:disabled{opacity:.45;cursor:default;transform:none}
+.toast{width:max-content;border-radius:22px}   /* a long toast (or one with an Undo button) wraps inside the screen instead of being squeezed into half of it */
+.toast:not(.show){opacity:0;pointer-events:none}
+.toast .toastBtn{margin-left:12px;border:1px solid rgba(255,255,255,.35);background:rgba(255,255,255,.14);color:#fff;border-radius:999px;padding:5px 14px;font-weight:700}
+.dupeNote{font-size:.85rem;line-height:1.35;color:var(--warn);background:rgba(253,230,138,.09);border:1px solid rgba(253,230,138,.24);border-radius:14px;padding:8px 12px;overflow-wrap:anywhere}
+.resultLine{display:inline-flex;align-items:center;gap:10px;flex-wrap:wrap}
+.clearBtn{padding:6px 14px;font-size:.82rem}
+.empty .ghost{margin-top:14px}
+
+/* ---------- controls bar: stays inside the page between 981 and 1219 px ---------- */
+.controls label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* the long Search label stays on one line now that the Select button takes room */
+@media (min-width:981px) and (max-width:1219px){
+  .controls{grid-template-columns:repeat(4,minmax(0,1fr))}
+  .controls .field:first-child{grid-column:1/-1}
+}
+
+/* ---------- phone (390 px) ---------- */
+@media (max-width:720px){
+  .subtitle{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;font-size:.85rem;margin-top:6px}
+  .topbar{gap:12px;margin-bottom:12px}
+  .tabs{gap:6px;margin:12px 0}
+  .tab{padding:9px 12px;font-size:.88rem}
+  .controls{grid-template-columns:1fr 1fr;gap:10px}
+  .controls .field:nth-child(-n+2){grid-column:1/-1}
+  .controls .toggleRow button{flex:1}
+  .controls .toggleRow:last-child{grid-column:1/-1}
+  .toggleRow .ghost{padding:10px 12px}
+  .listMeta>span:last-child{display:none}
+  .movieGrid:not(.compact) .card{contain-intrinsic-size:auto 390px}
+  input.selBox{top:12px;left:12px;width:24px;height:24px}
+  .cardActions .miniBtn{padding:7px 8px;font-size:.78rem}
+  .movieGrid.compact .placeBtn{padding:5px 8px;font-size:.72rem}
+  .selectBar{padding:8px 10px calc(8px + env(safe-area-inset-bottom, 0px))}
+  .selectBarInner{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:8px}
+  .selectCount{grid-column:1;grid-row:1;margin:0;font-size:.9rem}
+  #selectAllBtn{grid-column:2;grid-row:1}
+  #selectCancelBtn{grid-column:3;grid-row:1}
+  #selectMoveBtn{grid-column:1;grid-row:2}
+  #selectSeenBtn{grid-column:2;grid-row:2}
+  #selectUnseenBtn{grid-column:3;grid-row:2}
+  .selectBar button{padding:9px 6px;font-size:.8rem;white-space:normal;line-height:1.15}
+  body.selecting .app{padding-bottom:140px}
+  body.selecting .toast{bottom:calc(122px + env(safe-area-inset-bottom, 0px))}
+  .toast .toastBtn{margin-left:8px}
+}
