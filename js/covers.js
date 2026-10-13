@@ -320,11 +320,12 @@ function keepCover(id){
 function coverChipHtml(m){
   return m.poster && m.posterSource==='check' ? '<span class="chip checkPill" title="This cover came from an older version and may be the wrong film">Check cover</span>' : '';
 }
+// Only covers flagged by "Check old covers" get Keep / Wrong cover? on the card; any other cover is changed from the
+// details dialog (Change poster / Remove poster), so ordinary cards stay uncluttered.
 function coverButtonsHtml(m){
-  if(!m.poster) return '';
-  const id=escapeHtml(m.id), s=m.posterSource;
-  return (s==='check' ? `<button class="miniBtn keepBtn" data-keep-cover="${id}">Keep</button>` : '')
-    + (!s || s==='auto' || s==='check' ? `<button class="miniBtn wrongBtn" data-wrong-cover="${id}">Wrong cover?</button>` : '');   // not on covers the user chose
+  if(!m.poster || m.posterSource!=='check') return '';
+  const id=escapeHtml(m.id);
+  return `<button class="miniBtn keepBtn" data-keep-cover="${id}">Keep</button><button class="miniBtn wrongBtn" data-wrong-cover="${id}">Wrong cover?</button>`;
 }
 
 /* ---------- Poster picker (manual cover selection) ---------- */

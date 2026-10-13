@@ -319,7 +319,7 @@ function cardHtml(m, dupeCount){
   const posterBtn = m.poster
     ? `<button class="miniBtn" data-remove-poster="${id}">Remove poster</button>`
     : `<button class="miniBtn" data-searchposter="${id}">${m.posterRemoved===true?'Choose poster':'Find poster'}</button>`;
-  const coverBtns = coverButtonsHtml(m);   // Keep (flagged covers) and Wrong cover? (automatic, flagged and old-version covers), see covers.js
+  const coverBtns = coverButtonsHtml(m);   // Keep / Wrong cover? only on covers flagged by "Check old covers", see covers.js
   const extra = placeBtn || coverBtns ? `<div class="cardExtra">${placeBtn}${coverBtns}</div>` : '';
   return `<article class="${cls}" data-id="${id}" data-needs-poster="${needsPoster?'true':'false'}" style="--hue:${hue}">${selBox}
     <div class="cover">${img}<div class="coverTitle">${escapeHtml(shortCoverTitle(m.title))}</div><div class="formatBadge">${escapeHtml(m.format)}</div></div>
