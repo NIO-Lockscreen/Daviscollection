@@ -448,7 +448,7 @@ function unrejectCover(title, url){
 const AUTO_AMBIGUOUS = Symbol('ambiguous');
 // Section -> weak hint, used ONLY to choose between several films that share the title (never to override a unique match).
 const SECTION_HINT_WORDS = {
-  asian:/\b(Hong Kong|Chinese|China|Japanese|Japan|Korean|South Korea|Taiwanese|Taiwan|Thai|Thailand|Indian|Vietnamese|Filipino|Indonesian|Malaysian|Singaporean|Asian|martial arts|kung fu|wuxia|samurai)\b/i,
+  asian:/\b(Hong Kong|Chinese|China|Taiwanese|Taiwan|martial arts|kung fu|wuxia|Shaw Brothers|Golden Harvest|Japanese|samurai|Korean)\b/i,
   family:/\b(animated|animation|Disney|Pixar|DreamWorks|children'?s|family|musical)\b/i
 };
 function sectionHint(section){
@@ -619,7 +619,7 @@ const WIKI_PAGE_PROPS = {prop:'pageimages|description|extracts|pageprops', pipro
 // What an accepted page must BE. `head` is tested against the first noun phrase of the short description, so "1995 American crime film
 // directed by ..." passes while "American film director", "Year", "List of ... films" and "Film series" do not.
 const WIKI_KINDS = {
-  film:{qualifier:/\b(?:film|movie)\b/i, head:/\b(?:film|movie)(?:\s+(?:adaptation|noir))?$/i, sentence:/\b(?:is|was) an? [^.]{0,150}?\b(?:film|movie)\b/i, probes:['film'], search:'film'},
+  film:{qualifier:/\b(?:film|movie|(?:tv|television) special)\b/i, head:/\b(?:film|movie|(?:tv|television) special)(?:\s+(?:adaptation|noir))?$/i, sentence:/\b(?:is|was) an? [^.]{0,150}?\b(?:film|movie|(?:tv|television) special)\b/i, probes:['film'], search:'film'},
   tv:{qualifier:/\b(?:tv series|television series|miniseries)\b/i, head:/\b(?:series|miniseries|show|sitcom|serial|soap opera|telenovela)$/i, sentence:/\b(?:is|was) an? [^.]{0,150}?\b(?:series|miniseries|show|sitcom)\b/i, probes:['TV series','miniseries'], search:'television series'}
 };
 const WIKI_HEAD_END = /\s+(?:by|directed|starring|about|based|from|featuring|set|in|of|with|that|which|written|produced|released|for|on|at|made|where)\b|[,;(:]/i;
@@ -629,14 +629,18 @@ async function wikiQuery(params){
   for(const [k,v] of Object.entries({action:'query', format:'json', formatversion:'2', origin:'*', ...params})) url.searchParams.set(k, v);
   return fetchJson(url.toString());
 }
-function isDisambiguation(page){return !!(page?.pageprops && 'disambiguation' in page.pageprops);}
-/* null unless the page IS a film (or, kind 'tv', a TV series) whose title (minus "(… film)", "The"/"A") is one of the wanted titles.
-   Year, list, disambiguation, person and place pages fail the head-noun test. A page image that is not portrait (a still, a logo,
-   a photo) is not offered as the poster: posterUrl stays '' and the infobox is consulted instead. */
-function wikiFilmInfo(page, wanted, kind='film'){
+// Set-index pages ("Batman (film)": "Index of articles associated with the same name") carry no `disambiguation` page property but
+// are just as ambiguous.
+const WIKI_INDEX_DESCRIPTION = /^(?:Topics referred to by the same term|Index of articles associated with the same name)$/i;
+function isDisambiguation(page){return !!(page?.pageprops && 'disambiguation' in page.pageprops) || WIKI_INDEX_DESCRIPTION.test(String(page?.description || '').trim());}
+/* null unless the page IS a film (or, kind 'tv', a TV series) whose title (minus "(… film)", "The"/"A") is one of the wanted titles
+   (`anyTitle`: a typed lookup redirected here, which is evidence enough of the title). Year, list, disambiguation, person and place
+   pages fail the head-noun test. A page image that is not portrait (a still, a logo, a photo) is not offered as the poster:
+   posterUrl stays '' and the infobox is consulted instead. */
+function wikiFilmInfo(page, wanted, kind='film', anyTitle=false){
   const K=WIKI_KINDS[kind];
   const title=page.title || '';
-  if(!wanted.has(simpleText(stripArticleQualifier(title)))) return null;
+  if(!anyTitle && !wanted.has(simpleText(stripArticleQualifier(title)))) return null;
   const description=page.description || '';
   const extract=String(page.extract || '').slice(0,300);
   const qualifier=(title.match(/\(([^)]*)\)\s*$/) || [])[1] || '';
@@ -681,36 +685,47 @@ function wikiProbeTitles(ctx){
 /* Which film (or series) is this title? -> {status:'unique', film} | {status:'ambiguous'} | {status:'none'}.
    1. An explicit year in the title names the film (or nothing).
    2. Wikipedia's own primary topic: the title as the collection wrote it has ONE "X (film)" article (a redirect to the most notable
-      "X (1995 film)" counts) -> that film, however many same-named films exist. "The X" / "X" variants of the title don't count.
-   3. "X (film)" is a disambiguation page, or several films answer to the title -> only a catalog year or a section hint may choose.
+      "X (1995 film)" counts, and so does any redirect from the typed title) -> that film, however many same-named films with year
+      qualifiers exist. A different film under the "The"-added/removed title, however, makes it a homonym.
+   3. "X (film)" is a disambiguation or set-index page, or several films answer to the title -> only a catalog year or a section hint
+      may choose.
    4. A bare "X" film article is the primary topic too. 5. Nothing under the typed title: the same title with "The" added/removed.
    6. Nothing by exact lookup: Wikipedia's case-insensitive search, accepted only if it finds exactly one such film. */
 async function wikipediaIdentity(ctx){
   const K=WIKI_KINDS[ctx.kind];
   const probes=wikiProbeTitles(ctx);
-  const pages=[], redirects=new Map();
+  const pages=[], normalized=new Map(), redirects=new Map();
   for(let i=0;i<probes.length;i+=20){
     const data=await wikiQuery({...WIKI_PAGE_PROPS, titles:probes.slice(i,i+20).map(p=>p.title).join('|'), redirects:'1'});
     pagesFromWikiResponse(data).filter(p=>!p.missing).forEach(p=>pages.push(p));
-    for(const r of [...(data.query?.normalized || []), ...(data.query?.redirects || [])]) redirects.set(r.from, r.to);
+    for(const r of data.query?.normalized || []) normalized.set(r.from, r.to);
+    for(const r of data.query?.redirects || []) redirects.set(r.from, r.to);
   }
   const byTitle=new Map(pages.map(p=>[p.title, p]));
-  const resolve=t=>{for(let n=0;n<5 && redirects.has(t);n++) t=redirects.get(t); return byTitle.get(t);};
+  const resolve=title=>{   // -> {page, redirected}: the page a probe lands on, and whether a redirect led there
+    let t=normalized.get(title) || title, redirected=false;
+    for(let n=0;n<5 && redirects.has(t);n++){t=redirects.get(t); redirected=true;}
+    return {page:byTitle.get(t), redirected};
+  };
   const films=new Map();   // every matching film article seen, by page title
   const found={typed:{qualified:[], bare:[]}, alt:{qualified:[], bare:[]}};
   const dab={typed:false, alt:false};   // a disambiguation page stands where the "X (film)" article would be: several films share the title
   let anyDab=false;
-  const take=page=>{const info=wikiFilmInfo(page, ctx.wanted, ctx.kind); if(info) films.set(info.fullTitle, info); return info;};
+  const take=(page, anyTitle=false)=>{const info=wikiFilmInfo(page, ctx.wanted, ctx.kind, anyTitle); if(info) films.set(info.fullTitle, info); return info;};
   for(const probe of probes){
-    const page=resolve(probe.title);
+    const {page, redirected}=resolve(probe.title);
     if(!page) continue;
     const side=probe.alt ? 'alt' : 'typed';
     if(isDisambiguation(page)){
       if(ctx.wanted.has(simpleText(stripArticleQualifier(page.title)))){anyDab=true; if(probe.form!=='bare') dab[side]=true;}
       continue;
     }
-    const info=take(page);
-    if(info && probe.form!=='year') found[side][probe.form].push(info);
+    // A redirect from the title as the collection wrote it is evidence that the target IS that title ("Independence Day 2" ->
+    // "Independence Day: Resurgence"), so the target needs no matching name, only the film test. It counts like an "X (film)" find.
+    // Redirects from the "The"-added/removed forms are not trusted that far.
+    const viaRedirect=redirected && !probe.alt;
+    const info=take(page, viaRedirect);
+    if(info && probe.form!=='year') found[side][viaRedirect ? 'qualified' : probe.form].push(info);
   }
   const searchFound=[];
   const uniq=list=>[...new Map(list.map(f=>[f.fullTitle, f])).values()];
@@ -727,12 +742,14 @@ async function wikipediaIdentity(ctx){
       if(match.length===1) return unique(match[0]);
       return {status: match.length>1 || films.size || anyDab ? 'ambiguous' : 'none'};
     }
-    const primary=uniq(found.typed.qualified), bare=uniq(found.typed.bare);
-    if(primary.length===1 && !dab.typed && bare.every(f=>f.fullTitle===primary[0].fullTitle)) return unique(primary[0]);
-    if(primary.length || dab.typed || bare.length>1) return homonyms();
-    if(bare.length===1) return unique(bare[0]);
-    const alt=uniq([...found.alt.qualified, ...found.alt.bare]);
-    if(dab.alt || alt.length>1) return homonyms();
+    const typed=uniq([...found.typed.qualified, ...found.typed.bare]);
+    // A different film under the "The"-added/removed title is a homonym, not noise ("Graduate (film)" 2011 vs "The Graduate" 1967).
+    const alt=uniq([...found.alt.qualified, ...found.alt.bare]).filter(f=>!typed.some(t=>t.fullTitle===f.fullTitle));
+    if(typed.length){
+      if(typed.length===1 && !dab.typed && !alt.length) return unique(typed[0]);
+      return homonyms();
+    }
+    if(dab.typed || dab.alt || alt.length>1) return homonyms();
     if(alt.length===1) return unique(alt[0]);
     if(!searched) return {status:'none'};
     const hits=uniq(searchFound);
@@ -905,8 +922,10 @@ async function gatherTmdbCandidateList(cleaned, year, settings){
 }
 
 /* ---------- Title cleaning / variants / similarity ---------- */
+/* Typographic quotes to plain ones: Wikipedia and iTunes titles use ' and ", collection titles often have ’ (DADDY’S HOME). */
+function normalizeQuotes(text){return String(text ?? '').replace(/[‘’ʼ´`]/g,"'").replace(/[“”]/g,'"');}
 function normalizeTitle(rawTitle){
-  let title=String(rawTitle || '').trim();
+  let title=normalizeQuotes(rawTitle || '').trim();
   const original=title;
   const removed=[];
   title=title.replace(/[_]+/g,' ').replace(/\s+/g,' ').trim();
@@ -1112,7 +1131,7 @@ async function looseWikipediaCandidates(term){
 }
 function inferYearFromTitle(title){
   const key=simpleText(title);
-  const knownYears={se7en:'1995', seven:'1995', alien:'1979'};
+  const knownYears={se7en:'1995', alien:'1979'};
   return knownYears[key] || '';
 }
 function stripArticleQualifier(title){
@@ -1170,10 +1189,10 @@ function normalizeResult(result){
 /* ---------- Title variants ---------- */
 const NUMBER_WORDS={'1':'one','2':'two','3':'three','4':'four','5':'five','6':'six','7':'seven','8':'eight','9':'nine','10':'ten','11':'eleven','12':'twelve','13':'thirteen','14':'fourteen','15':'fifteen','16':'sixteen','17':'seventeen','18':'eighteen','19':'nineteen','20':'twenty'};
 function buildTitleVariants(title, year='', auto=false){
-  const base=compactSpaces(title);
+  const base=compactSpaces(normalizeQuotes(title));
   const variants=[];
   const add=value=>{
-    const cleaned=compactSpaces(value);
+    const cleaned=compactSpaces(normalizeQuotes(value));
     if(!cleaned) return;
     if(!variants.some(existing=>simpleText(existing)===simpleText(cleaned))) variants.push(cleaned);
   };
