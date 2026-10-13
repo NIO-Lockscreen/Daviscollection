@@ -68,13 +68,14 @@
       <div class="field"><label for="sectionFilter">Section</label><select id="sectionFilter"></select></div>
       <div class="field"><label for="formatFilter">Format</label><select id="formatFilter"></select></div>
       <div class="field"><label for="seenFilter">Seen</label><select id="seenFilter"><option value="all">Seen + unseen</option><option value="unseen">Not seen yet</option><option value="seen">Seen</option></select></div>
-      <div class="field"><label for="sortSelect">Sort</label><select id="sortSelect"><option value="title-asc">Title A–Z</option><option value="title-desc">Title Z–A</option><option value="added-desc">Newest added</option><option value="unseen-first">Unseen first</option><option value="dupes-first">Duplicates first</option></select></div>
+      <div class="field"><label for="sortSelect">Sort</label><select id="sortSelect"><option value="title-asc">Title A–Z</option><option value="title-desc">Title Z–A</option><option value="added-desc">Newest added</option><option value="unseen-first">Unseen first</option><option value="dupes-first">Duplicates first</option><option value="auto-first">Auto covers first</option></select></div>
       <div class="toggleRow"><button class="ghost" id="unsortedBtn">Unsorted</button></div>
-      <div class="toggleRow"><button class="ghost" id="viewToggle">List view</button></div>
+      <div class="toggleRow"><button class="ghost" id="viewToggle">List view</button><button class="ghost" id="selectToggle" aria-pressed="false" title="Tick several titles, then move them to a shelf or mark them seen">Select</button></div>
     </section>
 
-    <div class="listMeta"><span id="resultText">Showing 0 titles</span><span>Tip: list view is blueprint-style. Click a title to open cover, section, seen-status, barcode and notes.</span></div>
-    <section id="movieGrid" class="movieGrid" aria-live="polite"></section>
+    <div class="listMeta"><span class="resultLine"><span id="resultText" aria-live="polite">Showing 0 titles</span><button class="ghost clearBtn" id="clearFiltersBtn" hidden>Clear filters</button></span><span>Tip: list view is blueprint-style. Click a title to open cover, section, seen-status, barcode and notes.</span></div>
+    <section id="movieGrid" class="movieGrid"></section>
+    <div id="gridSentinel" class="gridSentinel" aria-hidden="true"></div>
   </main>
 
   <main id="add" class="screen">
@@ -83,7 +84,7 @@
         <h2>Add a movie</h2>
         <p>Scan the barcode on phone. New purchases start as <strong>UNSORTED / NOT PLACED</strong> until you move them into the collection. Everything is saved locally in this browser until you export/import a backup. To attach a cover, click <strong>Find poster</strong> and pick from the candidates.</p>
         <div class="formGrid">
-          <div class="field full"><label for="newTitle">Title</label><input id="newTitle" placeholder="Movie title"></div>
+          <div class="field full"><label for="newTitle">Title</label><input id="newTitle" placeholder="Movie title" autocomplete="off"><div class="dupeNote" id="titleDupeNote" role="status" hidden></div></div>
           <div class="field"><label for="newSection">Section</label><select id="newSection"></select></div>
           <div class="field"><label for="customSection">New section</label><input id="customSection" placeholder="Optional"></div>
           <div class="field"><label for="newFormat">Format</label><select id="newFormat"><option>4K UHD</option><option>4K Steelbook</option><option>Blu-ray</option><option>DVD</option><option>TV / Series</option><option>Blu-ray / DVD</option><option>Box set</option></select></div>
@@ -248,6 +249,32 @@
       </div>
     </div>
     <div class="actions"><button class="primary" id="coverSettingsSaveBtn">Save settings</button></div>
+  </div>
+</div>
+
+<div class="modal" id="shelfModal" role="dialog" aria-modal="true" aria-labelledby="shelfTitle">
+  <div class="modalCard shelfCard">
+    <div class="modalHead"><h2 id="shelfTitle">Place on shelf</h2></div>
+    <p class="shelfWhat" id="shelfWhat"></p>
+    <div class="formGrid">
+      <div class="field full"><label for="shelfSelect">Shelf</label><select id="shelfSelect"></select></div>
+      <div class="field full" id="shelfNewField" hidden><label for="shelfNewInput">New shelf name</label><input id="shelfNewInput" placeholder="e.g. HORROR 4K" autocomplete="off"></div>
+    </div>
+    <div class="actions">
+      <button class="ghost" id="shelfCancelBtn">Cancel</button>
+      <button class="primary" id="shelfOkBtn">Move</button>
+    </div>
+  </div>
+</div>
+
+<div class="selectBar" id="selectBar" role="toolbar" aria-label="Selected titles" hidden>
+  <div class="selectBarInner">
+    <span class="selectCount" id="selectCount">0 selected</span>
+    <button class="ghost" id="selectAllBtn">Select all</button>
+    <button class="primary" id="selectMoveBtn">Move to shelf…</button>
+    <button class="ghost" id="selectSeenBtn">Mark seen</button>
+    <button class="ghost" id="selectUnseenBtn">Mark unseen</button>
+    <button class="ghost" id="selectCancelBtn">Cancel</button>
   </div>
 </div>
 

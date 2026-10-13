@@ -193,7 +193,7 @@ async function quickPosterLookup(id){
     onSelect: poster => {
       if(m.poster && m.poster!==poster) rejectCover(m.title, m.poster);
       unrejectCover(m.title, poster);
-      m.poster=poster; m.posterRemoved=false; m.updated=today(); save();
+      m.poster=poster; m.posterSource='manual'; m.posterRemoved=false; m.updated=today(); save();
       updateCardPoster(id, poster, m.title);
       toast('Cover added.');
     }
@@ -361,7 +361,7 @@ async function autoLoadVisibleCover(id){
     if(!result?.posterUrl){autoCoverFailedSession.add(id); return 'none';}
     const m=state.movies.find(x=>x.id===id);
     if(!m || m.poster || m.posterRemoved===true) return 'skipped';
-    m.poster=result.posterUrl; m.posterRemoved=false; m.updated=today();
+    m.poster=result.posterUrl; m.posterSource='auto'; m.posterRemoved=false; m.updated=today();
     save();
     updateCardPoster(id, result.posterUrl, m.title);
     return 'found';
@@ -1182,18 +1182,24 @@ function markCardLoading(id,on){
   const cover=cardById(id)?.querySelector('.cover');
   if(cover) cover.classList.toggle('loading',!!on);
 }
+/* No click listeners here: app.js handles every data-* card button with one delegated handler on #movieGrid. */
 function cardPosterButton(id, hasPoster){
   const btn=document.createElement('button');
   btn.className='miniBtn';
   if(hasPoster){
     btn.dataset.removePoster=id;
     btn.textContent='Remove poster';
-    btn.addEventListener('click',e=>{e.stopPropagation(); removePoster(id);});
   }else{
     btn.dataset.searchposter=id;
     btn.textContent='Find poster';
-    btn.addEventListener('click',e=>{e.stopPropagation(); quickPosterLookup(id);});
   }
+  return btn;
+}
+function cardWrongCoverButton(id){
+  const btn=document.createElement('button');
+  btn.className='miniBtn wrongBtn';
+  btn.dataset.wrongCover=id;
+  btn.textContent='Wrong cover?';
   return btn;
 }
 function updateCardPoster(id,poster,title){
@@ -1212,12 +1218,18 @@ function updateCardPoster(id,poster,title){
   const actions=card.querySelector('.cardActions');
   if(findBtn) findBtn.replaceWith(cardPosterButton(id,true));
   else if(actions && !actions.querySelector('[data-remove-poster]')) actions.appendChild(cardPosterButton(id,true));
+  card.querySelectorAll('[data-wrong-cover]').forEach(b=>b.remove());
+  if(actions && state.movies.find(x=>x.id===id)?.posterSource==='auto'){   // only automatic covers can be flagged as wrong
+    let extra=card.querySelector('.cardExtra');
+    if(!extra){extra=document.createElement('div'); extra.className='cardExtra'; actions.after(extra);}
+    extra.appendChild(cardWrongCoverButton(id));
+  }
 }
 function removePoster(id, opts={}){
   const m=state.movies.find(x=>x.id===id); if(!m) return;
   if(!m.poster && m.posterRemoved===true){toast('Poster is already removed for this title.'); return;}
   if(m.poster) rejectCover(m.title, m.poster);   // also drops the title's cache entry: a wrong auto match must not come back from the cache
-  m.poster='';
+  m.poster=''; delete m.posterSource;
   m.posterRemoved=true;
   m.updated=today();
   autoCoverQueued.delete(id);
@@ -1230,6 +1242,19 @@ function removePoster(id, opts={}){
   render();
   toast('Poster removed. Auto cover loading is disabled for this title.');
 }
+/* "Wrong cover?" on a card with an automatic cover: blacklist that URL (and its cache entry) like removePoster does, then open the picker for a replacement. */
+function wrongCover(id){
+  const m=state.movies.find(x=>x.id===id); if(!m || !m.poster) return;
+  rejectCover(m.title, m.poster);
+  m.poster=''; delete m.posterSource;
+  m.posterRemoved=true;   // like removePoster: no automatic retry; the picker (or "Choose poster" later) picks the replacement
+  m.updated=today();
+  autoCoverQueued.delete(id);
+  autoCoverFailedSession.add(id);
+  save();
+  render();
+  quickPosterLookup(id);
+}
 /* A saved poster that no longer loads would leave a blank gradient card (its title is hidden while a poster is set).
    Reset the card to "needs poster" state instead, and forget the dead URL. */
 function onCoverImageError(e){
@@ -1239,7 +1264,7 @@ function onCoverImageError(e){
   const m=id && state.movies.find(x=>x.id===id);
   if(!m || !m.poster || img.getAttribute('src')!==m.poster) return;   // ignore stale events from a src that was already replaced
   rejectCover(m.title, m.poster);   // blacklists the dead URL and deletes this title's cache entries
-  m.poster='';                      // posterRemoved stays as it was: this is not a user decision
+  m.poster=''; delete m.posterSource;   // posterRemoved stays as it was: this is not a user decision
   m.updated=today();
   autoCoverQueued.delete(id);
   autoCoverFailedSession.add(id);   // do not retry in a loop this session
@@ -1248,4 +1273,5 @@ function onCoverImageError(e){
   card.querySelectorAll('.cover img').forEach(i=>i.remove());
   markCardLoading(id,false);
   card.querySelector('[data-remove-poster]')?.replaceWith(cardPosterButton(id,false));
+  card.querySelectorAll('[data-wrong-cover]').forEach(b=>b.remove());
 }
