@@ -83,14 +83,18 @@ Etter installasjon virker appens egne filer uten nett. Samlinga di ligger i nett
 
 `tests/cover-audit/` inneholder en fasit med 208 titler fra samlingen, merket med riktig film. Det er et tilfeldig utvalg fra alle hyllene pluss kjente feller. Åpne `tests/cover-audit/` på nettsiden (for eksempel `https://daviscollection.vercel.app/tests/cover-audit/`) eller lokalt, og trykk **Run audit**. Siden kjører appens ekte automatiske plakatoppslag på hver tittel. Den viser om plakaten er riktig film, feil film, ikke en plakat, en gjetning på en tvetydig tittel, eller bevisst hoppet over. Siden bare leser og endrer ikke samlingen.
 
-Resultat ved siste kjøring (Wikipedia-delen; iTunes kunne ikke nås fra testmiljøet):
+Resultat ved siste kjøring. iTunes kunne ikke nås fra testmiljøet, så tallene gjelder Wikipedia og TMDB. Alle plakatene er i tillegg sjekket for øyet.
 
-| | Før | Nå |
-|---|---|---|
-| Automatiske plakater | 150 | 116 |
-| Riktig film med ekte plakat | ca. 69 % | 97 % |
-| Feil film | 25 | 0 |
-| Foto/logo i stedet for plakat | ca. 11 | 0 |
+| | Før | Nå, uten TMDB | Nå, med innebygd TMDB-nøkkel |
+|---|---|---|---|
+| Automatiske plakater | 150 | 116 | 118 (105 fra TMDB) |
+| Riktig film med ekte plakat | ca. 69 % | 97 % | 97 % |
+| Feil film | 25 | 0 | 0 |
+| Foto/logo i stedet for plakat | ca. 11 | 0 | 0 |
+| Gjetning på tvetydig tittel | 11 | 3 | 3 |
+| Entydige titler med riktig plakat | 67 % | 66 % | 67 % |
+
+De tre gjetningene er alle sannsynlige: ROBOCOP → 1987, DESPERATE HOURS → 1990, SEVEN → 1995.
 
 ### Slik får du en gratis TMDB-nøkkel
 

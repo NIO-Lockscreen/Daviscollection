@@ -1104,8 +1104,13 @@
    "section": "KUNG FU",
    "format": "Blu-ray",
    "catalog": "",
-   "accept": [],
-   "ambiguous": true
+   "accept": [
+    {
+     "title": "Monkey Kung Fu",
+     "year": 1979
+    }
+   ],
+   "ambiguous": false
   },
   {
    "id": "seed-1330",
