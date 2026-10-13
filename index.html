@@ -68,7 +68,7 @@
       <div class="field"><label for="sectionFilter">Section</label><select id="sectionFilter"></select></div>
       <div class="field"><label for="formatFilter">Format</label><select id="formatFilter"></select></div>
       <div class="field"><label for="seenFilter">Seen</label><select id="seenFilter"><option value="all">Seen + unseen</option><option value="unseen">Not seen yet</option><option value="seen">Seen</option></select></div>
-      <div class="field"><label for="sortSelect">Sort</label><select id="sortSelect"><option value="title-asc">Title A–Z</option><option value="title-desc">Title Z–A</option><option value="added-desc">Newest added</option><option value="unseen-first">Unseen first</option><option value="dupes-first">Duplicates first</option><option value="auto-first">Auto covers first</option></select></div>
+      <div class="field"><label for="sortSelect">Sort</label><select id="sortSelect"><option value="title-asc">Title A–Z</option><option value="title-desc">Title Z–A</option><option value="added-desc">Newest added</option><option value="unseen-first">Unseen first</option><option value="dupes-first">Duplicates first</option><option value="auto-first">Covers to review first</option></select></div>
       <div class="toggleRow"><button class="ghost" id="unsortedBtn">Unsorted</button></div>
       <div class="toggleRow"><button class="ghost" id="viewToggle">List view</button><button class="ghost" id="selectToggle" aria-pressed="false" title="Tick several titles, then move them to a shelf or mark them seen">Select</button></div>
     </section>
@@ -241,6 +241,13 @@
         <button class="ghost" id="coverBulkBtn">Load missing covers</button>
         <progress id="coverBulkProgress" max="1" value="0" hidden></progress>
         <p class="coverHint" id="coverBulkStatus"></p>
+      </div>
+      <div class="field">
+        <label>Covers from an older version</label>
+        <button class="ghost" id="coverCheckBtn">Check old covers</button>
+        <progress id="coverCheckProgress" max="1" value="0" hidden></progress>
+        <p class="coverHint" id="coverCheckStatus"></p>
+        <p class="coverHint">An older version of the app picked covers by itself, and some were the wrong film. This looks each one up again and compares. A cover that matches is marked as verified; any other gets a “Check cover” tag on its card. Nothing is replaced unless you choose it (Keep, or Wrong cover?). Sort by “Covers to review first” to see them together. It makes many web requests, so it only runs when you start it.</p>
       </div>
       <div class="field">
         <label>Cover cache</label>

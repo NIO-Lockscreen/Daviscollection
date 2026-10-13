@@ -338,7 +338,9 @@ video{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
 .coverSettingsBody{display:grid;gap:18px}
 .coverSettingsBody .field button{align-self:flex-start}
 .coverHint{margin:0;color:var(--muted);font-size:.82rem;line-height:1.45}
-#coverBulkProgress{width:100%;height:8px;accent-color:#7dd3fc}
+#coverBulkProgress,#coverCheckProgress{width:100%;height:8px;accent-color:#7dd3fc}
+#coverCheckBtn:disabled{opacity:.45;cursor:default;transform:none}
+.pickerThumb.suggested{border-color:rgba(134,239,172,.7);box-shadow:0 0 0 2px rgba(134,239,172,.35)}
 .pickerThumb.rejected{opacity:.38}
 .pickerThumb.rejected:hover{opacity:.85}
 .pickerEmptyActions{display:flex;justify-content:center;margin:12px 0}
@@ -356,6 +358,8 @@ video{width:100%;height:100%;object-fit:cover;position:absolute;inset:0}
 .cardExtra .miniBtn{flex:1 1 auto}
 .placeBtn{background:linear-gradient(135deg, rgba(125,211,252,.22), rgba(192,132,252,.22));border-color:rgba(125,211,252,.45);font-weight:700}
 .wrongBtn{color:var(--warn);border-color:rgba(253,230,138,.3);background:rgba(253,230,138,.07)}
+.checkPill{color:var(--warn);border-color:rgba(253,230,138,.4);background:rgba(253,230,138,.12);font-weight:700}
+.keepBtn{border-color:rgba(134,239,172,.35);background:rgba(134,239,172,.09)}
 .movieGrid.compact .placeBtn{grid-column:3;grid-row:1;white-space:nowrap;padding:5px 10px;font-size:.76rem}
 
 /* ---------- select mode ---------- */
@@ -409,6 +413,7 @@ body.selecting .toast{bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
   .movieGrid:not(.compact) .card{contain-intrinsic-size:auto 390px}
   input.selBox{top:12px;left:12px;width:24px;height:24px}
   .cardActions .miniBtn{padding:7px 8px;font-size:.78rem}
+  .chip.checkPill:not(:first-child){display:block}   /* the phone layout hides every chip but the first: this one flags a cover to review */
   .movieGrid.compact .placeBtn{padding:5px 8px;font-size:.72rem}
   .selectBar{padding:8px 10px calc(8px + env(safe-area-inset-bottom, 0px))}
   .selectBarInner{display:grid;grid-template-columns:1.3fr 1fr 1fr;gap:8px}
