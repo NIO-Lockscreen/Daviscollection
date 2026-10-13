@@ -936,6 +936,8 @@ async function gatherPosterCandidates(searchTerm, options={}){
   const results=await Promise.all(jobs.map(([name, run])=>run().catch(e=>{warn(name, e); return null;})));
   const all=[];
   const seen=new Set();
+  // Titles that ARE the search term ("10") come before ones that merely contain it ("The Last 10 Years").
+  const wanted=new Set(buildTitleVariants(cleaned.title, year).map(simpleText));
   const push=r=>{
     const url=r?.posterUrl || r?.url;
     if(!url) return;
@@ -948,11 +950,13 @@ async function gatherPosterCandidates(searchTerm, options={}){
       label:r.title || r.label || '',
       year:r.year || '',
       score:Math.round((r.confidence || 0) * 100),
+      exact:wanted.has(simpleText(stripArticleQualifier(r.title || r.label || ''))),
+      votes:r.votes || 0,   // TMDB vote count: among same-named films the well-known one comes first
       rejected:isRejected(url)
     });
   };
   results.forEach(r=>[].concat(r || []).forEach(push));
-  all.sort((a,b)=>(a.rejected-b.rejected) || ((b.source==='TMDB')-(a.source==='TMDB')) || (b.score-a.score));
+  all.sort((a,b)=>(a.rejected-b.rejected) || (b.exact-a.exact) || ((b.source==='TMDB')-(a.source==='TMDB')) || (b.votes-a.votes) || (b.score-a.score));
   return all.slice(0,30);
 }
 
@@ -1064,7 +1068,7 @@ async function gatherTmdbCandidateList(cleaned, year, settings){
       const itemYear=r.release_date ? String(r.release_date).slice(0,4) : '';
       const yearScore=year && itemYear===year ? .14 : year && itemYear!==year ? -.07 : 0;
       const confidence=Math.min(.9, Math.max(coverTitleScore(cleaned, variant, r.title), coverTitleScore(cleaned, variant, r.original_title)) + yearScore);
-      if(confidence>=.36) out.push(normalizeResult({provider:'TMDB', confidence, title:r.title || r.original_title || '', year:itemYear, posterUrl:'https://image.tmdb.org/t/p/w500'+r.poster_path, pageUrl:'https://www.themoviedb.org/movie/'+r.id}));
+      if(confidence>=.36) out.push({...normalizeResult({provider:'TMDB', confidence, title:r.title || r.original_title || '', year:itemYear, posterUrl:'https://image.tmdb.org/t/p/w500'+r.poster_path, pageUrl:'https://www.themoviedb.org/movie/'+r.id}), votes:r.vote_count || 0});
     }
   }
   return out.sort((a,b)=>b.confidence-a.confidence).slice(0,10);
