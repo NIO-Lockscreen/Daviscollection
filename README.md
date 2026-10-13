@@ -8,12 +8,16 @@ Selve appen er på engelsk. Denne README-en er på norsk.
 
 - **Samlingsoversikt.** Alle titler vises som kort med cover, eller som kompakt liste («List view»). Du kan søke på tittel, strekkode og notater, filtrere på seksjon, format og sett/ikke sett, og sortere (A–Z, nyeste først, usette først, duplikater først). Øverst står tellere for antall titler, duplikater og usorterte titler, og en samlet samlingsverdi som kan justeres med historikk og «Rollback».
 - **Hyller/seksjoner.** Titlene er ordnet i seksjoner (hyller) slik de sto i den opprinnelige samlelista, for eksempel «TV ROOM». Hver tittel kan flyttes til en annen seksjon, og du kan opprette nye seksjoner.
-- **Hylla «UNSORTED / NOT PLACED».** Nye innkjøp havner automatisk her til du har bestemt hvor de skal stå. Knappen «Unsorted» viser bare disse titlene.
+- **Hylla «UNSORTED / NOT PLACED».** Nye innkjøp havner automatisk her til du har bestemt hvor de skal stå. Knappen «Unsorted» viser bare disse titlene. Hvert usortert kort har knappen **Place on shelf**, som flytter filmen til en hylle (eller en ny hylle) med ett trykk.
+- **Flytte mange på én gang.** Trykk **Select**, merk kortene, og bruk linja nederst: «Move to shelf…», «Mark seen» eller «Mark unseen». «Select all» merker alle titlene i det gjeldende filteret.
+- **Rask visning.** Kortene tegnes etter hvert som du blar, så samlingen åpner på et blunk også på mobil. Seksjonsfilteret viser antall titler per hylle, og «Clear filters» nullstiller søk og filtre.
 - **Sett / ikke sett.** Hver tittel kan merkes som sett. Filteret «Seen» og sorteringen «Unseen first» gjør det enkelt å finne noe du ikke har sett ennå.
-- **Strekkodeskanning på mobil.** Fanen «Add / scan» bruker kameraet til å lese strekkoden på plata, og kan slå opp et tittelforslag. Kameraet krever https eller localhost, så det virker på den publiserte siden, men ikke hvis du åpner `index.html` direkte fra disk.
+- **Strekkodeskanning på mobil.** Fanen «Add / scan» bruker kameraet til å lese strekkoden på plata, og kan slå opp et tittelforslag. Kameraet krever https eller localhost, så det virker på den publiserte siden, men ikke hvis du åpner `index.html` direkte fra disk. Ved feilsøk får du en lenke for å google strekkoden.
+- **Har jeg den allerede?** Når du skanner en strekkode eller skriver en tittel som allerede finnes i samlingen, sier appen fra med en gang («You already own this…» / «You already have…»). Det er nyttig i butikken.
+- **Angre.** Etter at du har slettet en film eller flyttet titler til en hylle, kan du angre i noen sekunder.
 - **Automatiske covers.** Se avsnittet «Coverbilder» under.
 - **«Blueprint»-eksport av samlelista.** Fanen «Blueprint export» lager en samleliste i samme stil som den gamle Word-lista: tittel øverst, seksjonsnavn og stjerne-punkter. Den kan lastes ned som HTML (kan åpnes i Word) eller TXT, eller skrives ut / lagres som PDF.
-- **Backup.** Menyen «Backup ▾» eksporterer og importerer hele samlingen som en JSON-fil.
+- **Backup.** Menyen «Backup ▾» eksporterer hele samlingen som en JSON-fil (eller et regneark, CSV) og importerer den igjen. Ved import velger du **Merge** (slå sammen) eller **Replace all**, og «Undo last import» angrer. En rød prikk på Backup-knappen minner deg på å ta backup når det er endringer som ikke er sikret.
 
 ## Publisering
 
