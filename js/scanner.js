@@ -7,6 +7,9 @@ const QUAGGA_URL='https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/qua
 const QUAGGA_SRI='sha384-IkRTkdAeAAAqE2ct5zNAfMiX8+H35pGJp8j7+ZFwh7PKaJh5eunsOFAb9l6Z9R7r';
 const QUAGGA_READERS=['ean_reader','ean_8_reader','upc_reader','upc_e_reader','code_128_reader','code_39_reader'];
 const QUAGGA_CONFIRM_MS=2000;    // Quagga must read the same code twice within this window
+const SCAN_COOLDOWN_MS=2500;     // continuous targets (phone scanner): the same code is reported again only after it was out of view this long
+let scanTarget=null;             // where the running camera draws and reports, see addScanTarget(); remote-scan.js passes its own
+let scanRecent=new Map();        // code -> last time it was seen (continuous targets only)
 let scanStream=null;
 let scanTimer=null;
 let scanDetector=null;
@@ -71,6 +74,39 @@ function showSearchFallback(code){
 function hideSearchFallback(){const box=$('scanFallback'); if(box) box.hidden=true}
 
 /* ---- barcode lookup ---- */
+/* Asks upcitemdb about a barcode. Never throws, has its own timeout, and signal (optional) cancels it.
+   Returns {ok:true,item,title,poster,notes} or {ok:false,kind,msg,status?}.
+   kind: rate | server | refused | unreadable | service | none | timeout | network | aborted (aborted = the caller's signal fired). */
+async function fetchBarcodeInfo(code, signal){
+  code=normalizeBarcode(code);
+  const ctl=new AbortController(), fail=(kind,msg,status)=>({ok:false,kind,msg,status});
+  const onAbort=()=>ctl.abort();
+  if(signal){if(signal.aborted) ctl.abort(); else signal.addEventListener('abort',onAbort,{once:true});}
+  let timedOut=false;
+  const timer=setTimeout(()=>{timedOut=true; ctl.abort();},LOOKUP_TIMEOUT_MS);
+  try{
+    const res=await fetch(LOOKUP_URL+encodeURIComponent(code),{signal:ctl.signal});
+    if(!res.ok){
+      if(res.status===429) return fail('rate','Daily barcode lookup limit reached (the free service allows only about 100 a day). Try again tomorrow.',429);
+      if(res.status>=500) return fail('server',`Barcode service is down or busy right now (HTTP ${res.status}).`,res.status);
+      return fail('refused',`Barcode service refused the lookup (HTTP ${res.status}).`,res.status);
+    }
+    let data=null;
+    try{data=await res.json();}catch(e){if(ctl.signal.aborted) throw e;}   // aborted = timeout / superseded, handled below
+    if(!data) return fail('unreadable','Barcode service sent an unreadable reply (captive portal or outage?).');
+    const item=data.items && data.items[0];
+    if(item) return {ok:true, item, title:cleanLookupTitle(item.title || ''), poster:item.images?.[0] || '', notes:[item.brand, item.description].filter(Boolean).join(' — ').slice(0,350)};
+    if(data.code && data.code!=='OK') return fail('service',`Barcode service said: ${data.message||data.code}.`);
+    return fail('none','No product data found for this barcode.');
+  }catch(e){
+    if(timedOut) return fail('timeout',`Barcode lookup timed out after ${LOOKUP_TIMEOUT_MS/1000} seconds.`);
+    if(ctl.signal.aborted) return fail('aborted','Lookup cancelled.');
+    return fail('network','Could not reach the barcode service (offline or blocked).');
+  }finally{
+    clearTimeout(timer);
+    if(signal) signal.removeEventListener('abort',onAbort);
+  }
+}
 async function lookupBarcode(code, fillForm=false){
   code=normalizeBarcode(code);
   if(!code){toast('Scan or type a barcode first.'); return;}
@@ -86,58 +122,43 @@ async function lookupBarcode(code, fillForm=false){
   const seq=++lookupSeq;
   if(lookupCtl) lookupCtl.abort();
   const ctl=lookupCtl=new AbortController();
-  let timedOut=false;
-  const timer=setTimeout(()=>{timedOut=true; ctl.abort();},LOOKUP_TIMEOUT_MS);
   setScanStatus('Looking up barcode…');
   try{
-    const res=await fetch(LOOKUP_URL+encodeURIComponent(code),{signal:ctl.signal});
-    if(seq!==lookupSeq) return;
-    if(!res.ok){
-      if(res.status===429) fail('Daily barcode lookup limit reached (the free service allows only about 100 a day). Try again tomorrow.');
-      else if(res.status>=500) fail(`Barcode service is down or busy right now (HTTP ${res.status}).`);
-      else fail(`Barcode service refused the lookup (HTTP ${res.status}).`);
-      return;
-    }
-    let data=null;
-    try{data=await res.json();}catch(e){if(ctl.signal.aborted) throw e;}   // aborted = timeout / superseded, handled below
-    if(seq!==lookupSeq) return;
-    if(!data){fail('Barcode service sent an unreadable reply (captive portal or outage?).'); return;}
-    const item=data && data.items && data.items[0];
-    if(item){
-      if(fillForm || !els.newTitle.value.trim()) els.newTitle.value = cleanLookupTitle(item.title || '');
-      if(item.images?.[0] && !els.newPoster.value.trim()) els.newPoster.value = item.images[0];
-      if(!els.newNotes.value.trim()) els.newNotes.value = [item.brand, item.description].filter(Boolean).join(' — ').slice(0,350);
-      if(!owned) toast('Barcode found. Check title and section before adding.');
-      setScanStatus(note+'Barcode found. Check title and section before adding.');
-    }else if(data && data.code && data.code!=='OK'){
-      fail(`Barcode service said: ${data.message||data.code}.`);
-    }else{
-      fail('No product data found for this barcode.');
-    }
-  }catch(e){
+    const r=await fetchBarcodeInfo(code,ctl.signal);
     if(seq!==lookupSeq) return;   // superseded by a newer lookup
-    fail(timedOut?`Barcode lookup timed out after ${LOOKUP_TIMEOUT_MS/1000} seconds.`:'Could not reach the barcode service (offline or blocked).');
+    if(!r.ok){fail(r.msg); return;}
+    if(fillForm || !els.newTitle.value.trim()) els.newTitle.value = r.title;
+    if(r.poster && !els.newPoster.value.trim()) els.newPoster.value = r.poster;
+    if(!els.newNotes.value.trim()) els.newNotes.value = r.notes;
+    if(!owned) toast('Barcode found. Check title and section before adding.');
+    setScanStatus(note+'Barcode found. Check title and section before adding.');
   }finally{
-    clearTimeout(timer);
     if(lookupCtl===ctl) lookupCtl=null;
   }
 }
 function cleanLookupTitle(t){return String(t||'').replace(/\s+(?:\(?\s*(?:blu[- ]?ray|dvd|4k|uhd|ultra hd)\s*\)?).*$/i,'').trim()}
 
 /* ---- camera scanner ---- */
-async function startScanner(){
-  stopScanner(false);
+/* The camera code serves one "target" at a time: {box,video,text,status,found,continuous}.
+   box = the .scanner element (gets .active), video = its <video>, text = the overlay line, status(msg) = progress/error line,
+   found(code) = called with a checksum-valid barcode. A single-shot target (the Add screen) stops the camera after a hit;
+   a continuous one (the phone scanner in remote-scan.js) keeps scanning and gets each code once per SCAN_COOLDOWN_MS. */
+function addScanTarget(){return {box:els.scanner, video:els.scanVideo, text:els.scannerText, status:setScanStatus, found:onBarcodeFound, continuous:false};}
+function curTarget(){return scanTarget || (scanTarget=addScanTarget());}
+async function startScanner(target){
+  stopScanner(false);                       // releases the camera on the previous target
+  const T=scanTarget=target && target.box ? target : addScanTarget();   // (a click event passed by mistake falls back to the Add screen)
   const tok=scanSession;
-  hideSearchFallback();
-  ownedNote=''; warnedKey='';
+  scanRecent=new Map();
+  if(T.box===els.scanner){hideSearchFallback(); ownedNote=''; warnedKey='';}
   if(document.hidden) return;
-  setScanStatus('Checking camera access…');
-  els.scanner.classList.add('active');
-  els.scannerText.textContent='Point camera at barcode.';
+  T.box.classList.add('active');
+  T.status('Checking camera access…');
+  T.text.textContent='Point camera at barcode.';
   if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
-    els.scanner.classList.remove('active');
-    els.scannerText.textContent='Camera API not available.';
-    setScanStatus('Camera needs HTTPS/localhost and a browser with getUserMedia support. Type the barcode manually on this device.');
+    T.box.classList.remove('active');
+    T.text.textContent='Camera API not available.';
+    T.status('Camera needs HTTPS/localhost and a browser with getUserMedia support. Type the barcode manually on this device.');
     return;
   }
   try{
@@ -147,15 +168,15 @@ async function startScanner(){
       const stream=await openBestCameraStream();
       if(tok!==scanSession){stopTracks(stream); return;}
       scanStream=stream; scanDetector=detector; nativeErrors=0;
-      const v=els.scanVideo;
+      const v=T.video;
       v.muted=true; v.playsInline=true; v.setAttribute('playsinline',''); v.setAttribute('muted','');
       v.srcObject=stream;
       await v.play();
       if(tok!==scanSession) return;
-      setScanStatus('Camera started. Scanning with native barcode detector…');
+      T.status('Camera started. Scanning with native barcode detector…');
       nativeScanLoop(tok);
     }else{
-      setScanStatus('This browser cannot read barcodes natively. Starting fallback scanner…');
+      T.status('This browser cannot read barcodes natively. Starting fallback scanner…');
       await startQuaggaFallback(tok);
     }
   }catch(e){
@@ -163,9 +184,20 @@ async function startScanner(){
   }
 }
 function failScanner(msg,text){
+  const T=curTarget();
   stopScanner(false);
-  els.scannerText.textContent=text;
-  setScanStatus(msg);
+  T.text.textContent=text;
+  T.status(msg);
+}
+// A barcode was read: single-shot targets get it once and the camera stops (returns true); continuous ones keep going (returns false).
+function deliverBarcode(raw){
+  const T=curTarget(), code=normalizeBarcode(raw);
+  if(!T.continuous){T.found(code); return true;}
+  const now=Date.now(), seen=scanRecent.get(code);
+  scanRecent.set(code,now);                 // a code that stays in view keeps its cooldown running
+  for(const [c,t] of scanRecent) if(now-t>=SCAN_COOLDOWN_MS) scanRecent.delete(c);
+  if(seen===undefined || now-seen>=SCAN_COOLDOWN_MS) T.found(code);
+  return false;
 }
 function stopTracks(s){if(s && s.getTracks) s.getTracks().forEach(t=>{try{t.stop()}catch(_){}})}
 
@@ -202,7 +234,7 @@ function cameraErrorMessage(e){
 }
 
 async function nativeScanLoop(tok){
-  const v=els.scanVideo;
+  const T=curTarget(), v=T.video;
   if(tok!==scanSession || !scanDetector || !v.srcObject) return;
   if(v.readyState>=2){   // skip frames until the video has data, so early InvalidStateErrors do not count
     try{
@@ -210,11 +242,12 @@ async function nativeScanLoop(tok){
       if(tok!==scanSession) return;
       nativeErrors=0;
       const hit=(codes||[]).find(c=>isValidBarcode(c.rawValue,c.format));
-      if(hit){onBarcodeFound(hit.rawValue); return;}
+      if(hit && deliverBarcode(hit.rawValue)) return;
+      if(tok!==scanSession || !scanDetector) return;   // found() may have stopped the camera
     }catch(e){
       if(tok!==scanSession) return;
       if(++nativeErrors>=NATIVE_MAX_ERRORS){   // detect() keeps throwing: the native detector is broken on this device
-        setScanStatus('Native detector is not working here. Switching to fallback scanner…');
+        T.status('Native detector is not working here. Switching to fallback scanner…');
         releaseCamera();
         await startQuaggaFallback(tok);
         return;
@@ -245,12 +278,13 @@ async function startQuaggaFallback(tok){
     await new Promise(r=>setTimeout(r,30));                  // let a previous Quagga.stop() finish tearing down
     if(tok!==scanSession) return;
     quaggaActive=true; quaggaHit=null;
+    const T=curTarget();
     // patchSize 'large': the barcode is held close, inside the guide frame, so it fills a big part of the image
     const base={decoder:{readers:QUAGGA_READERS}, locate:true, frequency:10, numOfWorkers:0, locator:{patchSize:'large', halfSample:true}};
     const attempts=[{facingMode:{ideal:'environment'}, width:{ideal:1280}, height:{ideal:720}}, {facingMode:{ideal:'environment'}}, {}];
     let err=null;
     for(const constraints of attempts){
-      quaggaInit=(async()=>Q.init({...base, inputStream:{type:'LiveStream', target:els.scanner, constraints}}))();
+      quaggaInit=(async()=>Q.init({...base, inputStream:{type:'LiveStream', target:T.box, constraints}}))();
       try{await quaggaInit; err=null; break;}
       catch(e){err=e; if(tok!==scanSession || ['NotAllowedError','SecurityError','NotReadableError'].includes(e?.name)) break;}
       finally{quaggaInit=null;}
@@ -259,7 +293,7 @@ async function startQuaggaFallback(tok){
     if(err) throw err;
     Q.onDetected(onQuaggaDetected);
     Q.start();
-    setScanStatus('Scanning with fallback detector…');
+    T.status('Scanning with fallback detector…');
   }catch(e){
     if(tok!==scanSession) return;
     if(e && e.load) failScanner('Could not load the fallback scanner (offline?). Type the barcode manually.','Fallback scanner unavailable.');
@@ -272,7 +306,7 @@ function onQuaggaDetected(result){
   if(!quaggaActive || !code) return;
   if(!isValidBarcode(code,cr.format)){quaggaHit=null; return;}
   const now=Date.now();
-  if(quaggaHit && quaggaHit.code===code && now-quaggaHit.t<=QUAGGA_CONFIRM_MS){onBarcodeFound(code); return;}
+  if(quaggaHit && quaggaHit.code===code && now-quaggaHit.t<=QUAGGA_CONFIRM_MS){quaggaHit={code,t:now}; deliverBarcode(code); return;}   // (a single-shot target stops the camera, which clears quaggaHit again)
   quaggaHit={code,t:now};
 }
 
@@ -295,28 +329,34 @@ function releaseCamera(){
     try{Promise.resolve(Q.CameraAccess && Q.CameraAccess.release()).catch(()=>{})}catch(_){}
   }
   quaggaActive=false; quaggaHit=null;
-  els.scanner.querySelectorAll('video').forEach(v=>{
+  const T=curTarget();
+  T.box.querySelectorAll('video').forEach(v=>{
     stopTracks(v.srcObject); v.pause(); v.srcObject=null;
-    if(v!==els.scanVideo) v.remove();
+    if(v!==T.video) v.remove();
   });
-  els.scanner.querySelectorAll('canvas').forEach(n=>n.remove());
+  T.box.querySelectorAll('canvas').forEach(n=>n.remove());
 }
 function stopScanner(showToast=true){
+  const T=curTarget();
   scanSession++;
   releaseCamera();
-  els.scanner.classList.remove('active');
-  els.scannerText.textContent='Camera is off.';
-  if(showToast) setScanStatus('Scanner stopped.');
+  T.box.classList.remove('active');
+  T.text.textContent='Camera is off.';
+  if(showToast) T.status('Scanner stopped.');
 }
 
 /* ---- init hook (called from init() in app.js) ---- */
 function initScanner(){
-  // the camera must never keep running in the background
-  const stopIfRunning=why=>{if(els.scanner.classList.contains('active')){stopScanner(false); setScanStatus(why);}};
+  // the camera must never keep running in the background (whichever target uses it)
+  const stopIfRunning=(why,addOnly)=>{
+    const T=curTarget();
+    if(addOnly && T.box!==els.scanner) return;
+    if(T.box.classList.contains('active')){stopScanner(false); T.status(why);}
+  };
   document.addEventListener('visibilitychange',()=>{if(document.hidden) stopIfRunning('Camera turned off because the page was hidden. Press Start scan to resume.');});
   window.addEventListener('pagehide',()=>stopIfRunning('Camera turned off.'));
   const add=$('add');
-  if(add) new MutationObserver(()=>{if(!add.classList.contains('active')) stopIfRunning('Camera turned off because you left the Add screen.');}).observe(add,{attributes:true,attributeFilter:['class']});
+  if(add) new MutationObserver(()=>{if(!add.classList.contains('active')) stopIfRunning('Camera turned off because you left the Add screen.',true);}).observe(add,{attributes:true,attributeFilter:['class']});
   // duplicate warning while typing / pasting a barcode
   els.newBarcode.addEventListener('input',()=>{hideSearchFallback(); checkOwned(els.newBarcode.value);});
   // addMovie() clears the field on success: drop the stale warning and fallback link

@@ -80,6 +80,18 @@
 
   <main id="add" class="screen">
     <section class="addWrap">
+      <div class="panel rsQueuePanel" id="rsQueuePanel" hidden>
+        <div class="rsQueueHead">
+          <h2>Scanned on phone</h2>
+          <div class="rsQueueTools">
+            <button class="ghost" id="rsAddAllBtn">Add all to Unsorted</button>
+            <button class="ghost" id="rsClearBtn">Dismiss all</button>
+          </div>
+        </div>
+        <p class="rsQueueHint" id="rsQueueHint"></p>
+        <div class="rsQueue" id="rsQueue"></div>
+      </div>
+
       <div class="panel">
         <h2>Add a movie</h2>
         <p>Scan the barcode on phone. New purchases start as <strong>UNSORTED / NOT PLACED</strong> until you move them into the collection. Everything is saved locally in this browser until you export/import a backup. To attach a cover, click <strong>Find poster</strong> and pick from the candidates.</p>
@@ -103,13 +115,14 @@
 
       <div class="panel">
         <h2>Barcode scanner</h2>
-        <p>Best on phone in landscape/portrait with the back camera. Hold the barcode inside the frame.</p>
+        <p>Best on phone in landscape/portrait with the back camera. Hold the barcode inside the frame. On a computer, use your phone as the scanner instead.</p>
         <div id="scanner" class="scanner">
           <video id="scanVideo" muted playsinline></video>
           <div class="scanGuide"></div>
           <div class="scannerText" id="scannerText">Camera is off.</div>
         </div>
         <div class="actions">
+          <button class="ghost" id="phoneScanBtn" title="Show a QR code; scan it with your phone to send barcodes to this computer">Use phone as scanner</button>
           <button class="primary" id="startScanBtn">Start scan</button>
           <button class="ghost" id="stopScanBtn">Stop</button>
         </div>
@@ -119,6 +132,29 @@
           <span>Read the title from the results, then type it in above.</span>
         </div>
       </div>
+    </section>
+  </main>
+
+  <main id="remote" class="screen">
+    <section class="panel rsPhone">
+      <h2>Remote scanner</h2>
+      <p>Barcodes you scan here are sent to your computer. Keep this page open while you scan.</p>
+      <div class="rsPhoneStatus" id="rsPhoneStatus" role="status" aria-live="polite">Connecting to PC…</div>
+      <p class="rsPhoneDetail" id="rsPhoneDetail" hidden></p>
+      <div id="rsScanner" class="scanner">
+        <video id="rsVideo" muted playsinline></video>
+        <div class="scanGuide"></div>
+        <div class="scannerText" id="rsScannerText">Camera is off.</div>
+      </div>
+      <div class="actions">
+        <button class="ghost" id="rsRetryBtn" hidden>Try again</button>
+        <button class="primary" id="rsStartBtn">Start scan</button>
+        <button class="ghost" id="rsStopBtn" disabled>Stop</button>
+      </div>
+      <div id="rsScanMsg" class="scanStatus"></div>
+      <h3 class="rsSentHead">Sent to the computer</h3>
+      <ul class="rsSent" id="rsSent"></ul>
+      <div class="actions rsExit"><button class="ghost" id="rsExitBtn">Use this phone normally</button></div>
     </section>
   </main>
 
@@ -274,6 +310,31 @@
   </div>
 </div>
 
+<div class="modal" id="rsModal" role="dialog" aria-modal="true" aria-labelledby="rsModalTitle">
+  <div class="modalCard rsModalCard">
+    <div class="modalHead"><h2 id="rsModalTitle">Use phone as scanner</h2><button class="ghost" id="rsModalCloseBtn">Close</button></div>
+    <div class="rsQr" id="rsQr" role="img" aria-label="QR code for pairing your phone" hidden></div>
+    <p class="rsHow" id="rsHow">Scan this with your phone's camera. Keep this window open.</p>
+    <div class="field" id="rsUrlField" hidden>
+      <label for="rsUrl">Or type this address in the phone's browser</label>
+      <input id="rsUrl" readonly spellcheck="false" autocomplete="off">
+    </div>
+    <div class="rsStatus" id="rsStatus" role="status" aria-live="polite">Connecting…</div>
+    <p class="rsDetail" id="rsDetail" hidden></p>
+    <div class="actions">
+      <button class="ghost" id="rsModalStopBtn">Stop</button>
+      <button class="primary" id="rsRestartBtn" hidden>Try again</button>
+    </div>
+    <p class="rsFine">Both devices need internet (they do not have to be on the same Wi-Fi). Barcodes travel encrypted between the phone and this window and are not stored on any server. Anyone with this QR code can send barcodes here, so stop the session when you are done.</p>
+  </div>
+</div>
+
+<div class="rsPill" id="rsPill" role="status" hidden>
+  <button class="rsPillMain" id="rsPillMain" title="Show the QR code again"><span id="rsPillText">📱 Phone scanner connected</span></button>
+  <span class="rsPillDot" aria-hidden="true">·</span>
+  <button class="rsPillStop" id="rsPillStop">Stop</button>
+</div>
+
 <div class="selectBar" id="selectBar" role="toolbar" aria-label="Selected titles" hidden>
   <div class="selectBarInner">
     <span class="selectCount" id="selectCount">0 selected</span>
@@ -291,6 +352,7 @@
 <script src="js/storage.js"></script>
 <script src="js/covers.js"></script>
 <script src="js/scanner.js"></script>
+<script src="js/remote-scan.js"></script>
 <script src="js/app.js"></script>
 <script src="js/pwa.js"></script>
 </body>

@@ -3,12 +3,12 @@
  * - Precaches the app shell so the app opens offline.
  * - Same-origin GET requests are served network-first (updates show up as soon as you are online)
  *   and fall back to the cache when the network is unavailable.
- * - Cross-origin requests (cover APIs, poster images, the Quagga CDN) are never touched.
+ * - Cross-origin requests (cover APIs, poster images, the Quagga / PeerJS / QR code CDN scripts) are never touched.
  *
  * To force every installed copy to refresh its precache, bump CACHE_VERSION below.
  * All paths are relative, so the app works both at the domain root and under /<repo-name>/.
  */
-const CACHE_VERSION = 'v1';
+const CACHE_VERSION = 'v2';
 const CACHE = 'movie-vault-' + CACHE_VERSION;
 
 const SHELL = [
@@ -19,6 +19,7 @@ const SHELL = [
   'js/storage.js',
   'js/covers.js',
   'js/scanner.js',
+  'js/remote-scan.js',
   'js/app.js',
   'js/pwa.js',
   'manifest.webmanifest',

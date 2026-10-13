@@ -58,7 +58,7 @@ function init(){
   els.addMovieBtn.addEventListener('click', addMovie);
   els.posterLookupBtn.addEventListener('click',()=>lookupPosterForForm('new'));
   els.barcodeLookupBtn.addEventListener('click',()=>lookupBarcode(els.newBarcode.value.trim(), true));
-  els.startScanBtn.addEventListener('click',startScanner);
+  els.startScanBtn.addEventListener('click',()=>startScanner());
   els.stopScanBtn.addEventListener('click',stopScanner);
   initScanner();
   els.backupMenuBtn.addEventListener('click',()=>toggleBackupMenu());
@@ -78,6 +78,9 @@ function init(){
   window.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal(); closePosterPicker(); closeValueModal(); closeShelfPicker();}});
   initBackupUi();
   populateSelects();
+  if(!initRemoteScan()) showCollectionView();   // a phone paired through a QR code shows only the remote scanner: no collection render, no cover lookups
+}
+function showCollectionView(){
   if (window.matchMedia('(max-width: 720px)').matches) showScreen('add');
   renderFresh();
   updateBlueprintPreview();
@@ -335,15 +338,21 @@ function getSectionFromForm(prefix){
   if(!state.sectionOrder.includes(section)) state.sectionOrder.push(section);
   return section;
 }
+// Puts a new title at the top of the collection (not saved yet: callers save() once). f = {title,section,format,barcode,poster,notes,seen}; used by the Add form and by the phone-scanner queue (remote-scan.js).
+function newMovie(f){
+  const movie={id:cryptoId(), title:f.title, section:f.section, format:f.format, barcode:f.barcode||'', poster:f.poster||'', posterRemoved:false, notes:f.notes||'', seen:!!f.seen, added:today(), updated:today()};
+  if(movie.poster) movie.posterSource='manual';
+  if(!state.sectionOrder.includes(movie.section)) state.sectionOrder.push(movie.section);
+  state.movies.unshift(movie);
+  return movie;
+}
 function addMovie(){
   const title=els.newTitle.value.trim();
   if(!title){toast('Add a title first.'); els.newTitle.focus(); return;}
-  const movie={id:cryptoId(), title, section:getSectionFromForm('new'), format:els.newFormat.value, barcode:els.newBarcode.value.trim(), poster:els.newPoster.value.trim(), posterRemoved:false, notes:els.newNotes.value.trim(), seen:!!els.newSeen.checked, added:today(), updated:today()};
-  if(movie.poster) movie.posterSource='manual';
-  state.movies.unshift(movie);
+  newMovie({title, section:getSectionFromForm('new'), format:els.newFormat.value, barcode:els.newBarcode.value.trim(), poster:els.newPoster.value.trim(), notes:els.newNotes.value.trim(), seen:els.newSeen.checked});
   save();
   ['newTitle','customSection','newBarcode','newPoster','newNotes'].forEach(id=>els[id].value=''); els.newSeen.checked=false; els.newSection.value=UNSORTED_SECTION;
-  updateTitleDupes(); populateSelects(); render(); toast(`Added ${title}`);
+  updateTitleDupes(); populateSelects(); render(); renderQueue(); toast(`Added ${title}`);   // (the phone-scanner queue re-checks "already own")
 }
 // Inline note under the Add title field: titles you already own that equal the typed one or start with it (barcode duplicates are scanner.js's job).
 function updateTitleDupes(){

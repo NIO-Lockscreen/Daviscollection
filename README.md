@@ -13,11 +13,36 @@ Selve appen er på engelsk. Denne README-en er på norsk.
 - **Rask visning.** Kortene tegnes etter hvert som du blar, så samlingen åpner på et blunk også på mobil. Seksjonsfilteret viser antall titler per hylle, og «Clear filters» nullstiller søk og filtre.
 - **Sett / ikke sett.** Hver tittel kan merkes som sett. Filteret «Seen» og sorteringen «Unseen first» gjør det enkelt å finne noe du ikke har sett ennå.
 - **Strekkodeskanning på mobil.** Fanen «Add / scan» bruker kameraet til å lese strekkoden på plata, og kan slå opp et tittelforslag. Kameraet krever https eller localhost, så det virker på den publiserte siden, men ikke hvis du åpner `index.html` direkte fra disk. Ved feilsøk får du en lenke for å google strekkoden.
+- **Mobilen som skanner for PC-en.** På «Add / scan» på PC-en trykker du **Use phone as scanner**, skanner QR-koden med mobilens vanlige kamera-app, og strekkodene du skanner på mobilen dukker opp live på PC-en. Se avsnittet «Mobilen som skanner for PC-en» under.
 - **Har jeg den allerede?** Når du skanner en strekkode eller skriver en tittel som allerede finnes i samlingen, sier appen fra med en gang («You already own this…» / «You already have…»). Det er nyttig i butikken.
 - **Angre.** Etter at du har slettet en film eller flyttet titler til en hylle, kan du angre i noen sekunder.
 - **Automatiske covers.** Se avsnittet «Coverbilder» under.
 - **«Blueprint»-eksport av samlelista.** Fanen «Blueprint export» lager en samleliste i samme stil som den gamle Word-lista: tittel øverst, seksjonsnavn og stjerne-punkter. Den kan lastes ned som HTML (kan åpnes i Word) eller TXT, eller skrives ut / lagres som PDF.
 - **Backup.** Menyen «Backup ▾» eksporterer hele samlingen som en JSON-fil (eller et regneark, CSV) og importerer den igjen. Ved import velger du **Merge** (slå sammen) eller **Replace all**, og «Undo last import» angrer. En rød prikk på Backup-knappen minner deg på å ta backup når det er endringer som ikke er sikret.
+
+## Mobilen som skanner for PC-en
+
+Praktisk når du sitter ved PC-en med en stabel plater: telefonen er skanneren, og PC-en viser tittel, advarsel om duplikat og knapper for å legge filmen til.
+
+1. Åpne appen på PC-en (`https://daviscollection.vercel.app`), gå til **Add / scan** og trykk **Use phone as scanner**. Det kommer opp en QR-kode.
+2. Skann QR-koden med mobilens vanlige kamera-app og åpne lenken. Appen åpnes på telefonen i **Remote scanner**-modus, koblet til PC-en. Ingen konto eller innlogging trengs, og samlingen trenger ikke ligge på telefonen.
+3. Trykk **Start scan** på telefonen og hold strekkoden foran kameraet. Kameraet fortsetter å skanne etter hvert treff (samme kode sendes ikke på nytt før den har vært ute av bildet i ca. 2,5 sekunder), og telefonen vibrerer for hver kode som sendes. Under kameraet ser du hva PC-en svarte: tittelen, eller «Already in collection: …».
+4. På PC-en kommer hver kode i panelet **Scanned on phone** (øverst på Add / scan) med strekkode, tittelforslag og, hvis du har den fra før, «You already own: TITTEL (HYLLE)». Per kode kan du velge **Add to Unsorted** (legger filmen på hylla UNSORTED / NOT PLACED med tittel og strekkode), **Edit first** (fyller ut skjemaet «Add a movie», så du kan rette tittel eller format før du legger til) eller **Dismiss**. **Add all to Unsorted** legger til alle som har tittel og som du ikke eier fra før. Etter å ha lagt til kan du angre i noen sekunder (Undo). Samme kode to ganger gir ikke to rader, den eksisterende raden blinker.
+5. Du kan lukke QR-vinduet. Økten fortsetter så lenge pillen **«📱 Phone scanner connected · Stop»** vises nederst til venstre. Trykk **Stop** når du er ferdig. Bare én telefon er koblet til om gangen.
+6. På telefonen tar **Use this phone normally** deg ut av Remote scanner og tilbake til vanlig app.
+
+Slik virker det: PC-en og telefonen kobles direkte til hverandre (WebRTC, via biblioteket PeerJS). Den gratis, offentlige signalserveren `0.peerjs.com` brukes bare til å få de to til å finne hverandre, og vi har ingen egen server. Det som sendes er kun strekkodetallene, kryptert mellom enhetene, og de lagres ikke noe sted. Strekkodeoppslaget (upcitemdb) og sjekken mot samlingen gjøres på PC-en. PeerJS og QR-biblioteket lastes først når du bruker funksjonen (fast versjon fra jsDelivr, med SRI-sjekk), så resten av appen er upåvirket.
+
+Sikkerhet: PC-ens tilfeldige id i QR-koden (ca. 80 bits) er den eneste tilgangskontrollen. Den som kjenner lenken, mens økten pågår, kan sende strekkoder til PC-vinduet. Ikke del bilde av QR-koden, og trykk **Stop** når du er ferdig. PC-en godtar bare riktig utformede strekkoder og ignorerer alt annet.
+
+Feilsøking:
+
+- **Begge enhetene trenger internett.** De trenger ikke være på samme Wi-Fi. Står det at telefonen eller PC-en ikke får lastet bibliotek eller nå «pairing server», er det nettet som mangler eller blokkerer `cdn.jsdelivr.net` / `0.peerjs.com`.
+- **Hold PC-vinduet åpent.** Lukker du fanen eller lar PC-en gå i dvale, står det «PC not found — is the PC window still open?» på telefonen. Åpne vinduet igjen og trykk **Try again** (ny QR-kode hvis du måtte starte økten på nytt).
+- **Noen nettverk blokkerer direkte forbindelse mellom enheter** (bedrifts- og gjestenett, noen mobilnett). Prøv mobildata på telefonen eller et annet Wi-Fi.
+- Slår telefonskjermen seg av, stopper kameraet. Appen prøver å holde skjermen våken, og kobler seg til PC-en igjen av seg selv når den kommer tilbake (opptil fem forsøk, deretter **Try again**).
+- Det gratis strekkodeoppslaget tillater ca. 100 oppslag om dagen, og det teller på PC-ens nett.
+- Testing: `window.MV_PEER_OPTIONS` (alle PeerJS-valg) eller `?peerhost=localhost:9000` peker appen mot en lokal `peerjs`-server (kun localhost/127.0.0.1) i stedet for den gratis skyen.
 
 ## Publisering
 
@@ -68,7 +93,7 @@ Appen kan installeres, åpner da i eget vindu uten nettleser-menyer, og har eget
 - **Android (Chrome):** åpne siden → meny (⋮) → **Installer app** (Install app), eller **Legg til på startskjermen** (Add to home screen).
 - **PC (Chrome eller Edge):** trykk på installasjonsikonet ytterst i adressefeltet, eller velg menyen → **Installer Movie Vault**.
 
-Etter installasjon virker appens egne filer uten nett. Samlinga di ligger i nettleserens lagring og vises også uten nett. Coverbilder, oppslag av strekkoder og reserveskanneren (lastes fra en CDN) trenger derimot nett. Coverbilder hentes fra internett og vises uten nett bare hvis nettleseren har dem i sin egen hurtigbuffer.
+Etter installasjon virker appens egne filer uten nett. Samlinga di ligger i nettleserens lagring og vises også uten nett. Coverbilder, oppslag av strekkoder, reserveskanneren og «mobilen som skanner» (lastes fra en CDN) trenger derimot nett. Coverbilder hentes fra internett og vises uten nett bare hvis nettleseren har dem i sin egen hurtigbuffer.
 
 ## Coverbilder
 
@@ -120,6 +145,7 @@ js/seed-data.js        Startlista med titler (brukes bare første gang)
 js/storage.js          Lagring i localStorage, normalisering, JSON-backup, blueprint-eksport
 js/covers.js           Automatisk cover-oppslag og plakatvelgeren
 js/scanner.js          Strekkodeoppslag og kameraskanner
+js/remote-scan.js      Mobilen som skanner for PC-en (QR-kode, PeerJS, kø med skannede koder)
 js/app.js              Tilstand, oppstart, visning av kort, redigering og verdi
 js/pwa.js              Registrerer service workeren (bare på http/https, ikke fra fil)
 icons/                 Appikonet (icon.svg og de ferdige PNG-filene)
