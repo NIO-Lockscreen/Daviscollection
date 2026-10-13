@@ -68,9 +68,24 @@ Etter installasjon virker appens egne filer uten nett. Samlinga di ligger i nett
 
 ## Coverbilder
 
-- **Automatisk.** Når et kort uten cover kommer til syne mens du blar, søker appen etter plakat hos **iTunes (Apple)** og **Wikipedia**, og lagrer treffet. Svarene mellomlagres en stund i nettleseren, så hver tittel slås bare opp én gang.
-- **Manuelt.** Trykk **Find poster** (i «Add / scan» eller i detaljvisningen til en film). Da åpnes en velger med forslag. Trykk på riktig plakat, endre søketeksten og søk på nytt, eller lim inn en egen bilde-URL. «Remove poster» fjerner coveret igjen.
-- **Valgfri TMDB-nøkkel for bedre treff.** I plakatvelgeren finner du knappen **Cover settings**. Der kan du lime inn en API-nøkkel fra The Movie Database (TMDB). Nøkkelen lagres bare i nettleseren. Uten nøkkel bruker appen iTunes og Wikipedia.
+- **Automatisk.** Når et kort uten cover kommer til syne mens du blar, slår appen opp filmen og lagrer plakaten. Wikipedia brukes til å fastslå *hvilken* film tittelen er, og om flere filmer deler navnet. Plakaten hentes så fra TMDB (med nøkkel), iTunes eller Wikipedia, og bare når tittel og år stemmer med den filmen. Bildet må laste og være stående (plakatformat), slik at pressefoto, logoer og tittelskjermer aldri brukes.
+- **Heller ingen plakat enn feil plakat.** Er tittelen tvetydig, får kortet ingen automatisk plakat. Eksempler: HEAT (1986 og 1995), TITANIC, PSYCHO, eller når både «X» og «The X» finnes som filmer. Det samme gjelder forkortede og feilstavede titler (GARP, RAGINGBULL) og bokser med flere filmer («1, 2 & 3», TRILOGY). Velg da plakaten selv med **Find poster**.
+- **Manuelt.** Trykk **Find poster** (i «Add / scan» eller i detaljvisningen til en film). Da åpnes en velger med forslag fra iTunes, Wikipedia og eventuelt TMDB. Trykk på riktig plakat, endre søketeksten og søk på nytt, bruk **Google Images**, eller lim inn en egen bilde-URL. En plakat du fjerner eller bytter ut, blir husket som avvist og foreslås ikke igjen. En plakatlenke som slutter å virke, fjernes automatisk, og kortet får knappen «Find poster» igjen.
+- **Cover settings** (tannhjulet i plakatvelgeren): valgfri TMDB-nøkkel, land for iTunes-søk, **Load missing covers** (går gjennom alle titler uten plakat, med fremdrift og Avbryt), og tømming av cover-mellomlageret.
+- **Valgfri TMDB-nøkkel for bedre treff.** Nøkkelen lagres bare i nettleseren og er aldri med i backup-filer. Uten nøkkel bruker appen iTunes og Wikipedia.
+
+### Sjekke at plakatene blir riktige
+
+`tests/cover-audit/` inneholder en fasit med 208 titler fra samlingen, merket med riktig film. Det er et tilfeldig utvalg fra alle hyllene pluss kjente feller. Åpne `tests/cover-audit/` på nettsiden (for eksempel `https://daviscollection.vercel.app/tests/cover-audit/`) eller lokalt, og trykk **Run audit**. Siden kjører appens ekte automatiske plakatoppslag på hver tittel. Den viser om plakaten er riktig film, feil film, ikke en plakat, en gjetning på en tvetydig tittel, eller bevisst hoppet over. Siden bare leser og endrer ikke samlingen.
+
+Resultat ved siste kjøring (Wikipedia-delen; iTunes kunne ikke nås fra testmiljøet):
+
+| | Før | Nå |
+|---|---|---|
+| Automatiske plakater | 150 | 116 |
+| Riktig film med ekte plakat | ca. 69 % | 97 % |
+| Feil film | 25 | 0 |
+| Foto/logo i stedet for plakat | ca. 11 | 0 |
 
 ### Slik får du en gratis TMDB-nøkkel
 
@@ -97,6 +112,7 @@ js/scanner.js          Strekkodeoppslag og kameraskanner
 js/app.js              Tilstand, oppstart, visning av kort, redigering og verdi
 js/pwa.js              Registrerer service workeren (bare på http/https, ikke fra fil)
 icons/                 Appikonet (icon.svg og de ferdige PNG-filene)
+tests/cover-audit/     Fasit og testside for automatiske plakater (se «Sjekke at plakatene blir riktige»)
 ```
 
 Skriptene er vanlige `<script>`-tagger (ikke moduler) som lastes i den rekkefølgen som står i `index.html`, slik at appen også virker når `index.html` åpnes direkte fra disk. `js/pwa.js` lastes sist.
