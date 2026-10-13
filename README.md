@@ -72,12 +72,12 @@ Etter installasjon virker appens egne filer uten nett. Samlinga di ligger i nett
 
 ## Coverbilder
 
-- **Automatisk.** Når et kort uten cover kommer til syne mens du blar, slår appen opp filmen og lagrer plakaten. Wikipedia brukes til å fastslå *hvilken* film tittelen er, og om flere filmer deler navnet. Plakaten hentes så fra TMDB (med nøkkel), iTunes eller Wikipedia, og bare når tittel og år stemmer med den filmen. Bildet må laste og være stående (plakatformat), slik at pressefoto, logoer og tittelskjermer aldri brukes.
+- **Automatisk.** Når et kort uten cover kommer til syne mens du blar, slår appen opp filmen og lagrer plakaten. Wikipedia brukes til å fastslå *hvilken* film tittelen er, og om flere filmer deler navnet. Plakaten hentes så fra TMDB, iTunes eller Wikipedia, og bare når tittel og år stemmer med den filmen. Bildet må laste og være stående (plakatformat), slik at pressefoto, logoer og tittelskjermer aldri brukes.
 - **Heller ingen plakat enn feil plakat.** Er tittelen tvetydig, får kortet ingen automatisk plakat. Eksempler: HEAT (1986 og 1995), TITANIC, PSYCHO, eller når både «X» og «The X» finnes som filmer. Det samme gjelder forkortede og feilstavede titler (GARP, RAGINGBULL) og bokser med flere filmer («1, 2 & 3», TRILOGY). Velg da plakaten selv med **Find poster**.
-- **Manuelt.** Trykk **Find poster** (i «Add / scan» eller i detaljvisningen til en film). Da åpnes en velger med forslag fra iTunes, Wikipedia og eventuelt TMDB. Trykk på riktig plakat, endre søketeksten og søk på nytt, bruk **Google Images**, eller lim inn en egen bilde-URL. En plakat du fjerner eller bytter ut, blir husket som avvist og foreslås ikke igjen. En plakatlenke som slutter å virke, fjernes automatisk, og kortet får knappen «Find poster» igjen.
-- **Cover settings** (tannhjulet i plakatvelgeren): valgfri TMDB-nøkkel, land for iTunes-søk, **Load missing covers** (går gjennom alle titler uten plakat, med fremdrift og Avbryt), og tømming av cover-mellomlageret.
+- **Manuelt.** Trykk **Find poster** (i «Add / scan» eller i detaljvisningen til en film). Da åpnes en velger med forslag fra TMDB, iTunes og Wikipedia. Trykk på riktig plakat, endre søketeksten og søk på nytt, bruk **Google Images**, eller lim inn en egen bilde-URL. En plakat du fjerner eller bytter ut, blir husket som avvist og foreslås ikke igjen. En plakatlenke som slutter å virke, fjernes automatisk, og kortet får knappen «Find poster» igjen.
+- **Cover settings** (tannhjulet i plakatvelgeren): egen TMDB-nøkkel (valgfritt), land for iTunes-søk, **Load missing covers** (går gjennom alle titler uten plakat, med fremdrift og Avbryt), og tømming av cover-mellomlageret.
 - **Plakater fra den gamle versjonen.** Den forrige versjonen av appen valgte ofte feil plakat (cirka hver fjerde var feil film, eller et foto/logo). Har du brukt den, sier appen fra ved oppstart. **Check old covers** i Cover settings sjekker alle gamle plakater med den nye logikken. Bekreftede plakater beholdes uten merking. Usikre får merket **Check cover**, med knappene **Keep** og **Wrong cover?** (som viser et forslag først). Ingenting byttes ut uten at du velger det. Sorteringen «Covers to review first» samler alle som bør sees på.
-- **Valgfri TMDB-nøkkel for bedre treff.** Nøkkelen lagres bare i nettleseren og er aldri med i backup-filer. Uten nøkkel bruker appen iTunes og Wikipedia.
+- **TMDB-nøkkel.** Appen har en innebygd TMDB-nøkkel, så TheMovieDB brukes automatisk. Nøkkelen ligger obfuskert i `js/covers.js` (`TMDB_BUILTIN_KEY`) for å unngå at den står i klartekst i det offentlige repoet. En nettleser må likevel sende den til TMDB, så den er ikke hemmelig. Legger du inn en egen nøkkel under Cover settings, brukes den i stedet. Den lagres bare i nettleseren og er aldri med i backup-filer. Tøm feltet for å gå tilbake til den innebygde.
 
 ### Sjekke at plakatene blir riktige
 
@@ -93,6 +93,8 @@ Resultat ved siste kjøring (Wikipedia-delen; iTunes kunne ikke nås fra testmil
 | Foto/logo i stedet for plakat | ca. 11 | 0 |
 
 ### Slik får du en gratis TMDB-nøkkel
+
+Trengs bare hvis den innebygde nøkkelen slutter å virke (appen sier da fra med «TMDB rejected the API key»), eller hvis du vil bruke din egen.
 
 1. Opprett en gratis konto på <https://www.themoviedb.org/signup> og bekreft e-postadressen.
 2. Logg inn og gå til <https://www.themoviedb.org/settings/api> (profilbildet → Settings → API).

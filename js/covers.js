@@ -90,7 +90,7 @@ function setupCoverSettingsUi(){
 }
 function openCoverSettings(){
   const modal=$('coverSettingsModal'); if(!modal) return;
-  $('tmdbKeyInput').value=getTmdbKey();
+  $('tmdbKeyInput').value=getUserTmdbKey();   // the built-in key is never shown
   const current=getCoverSettings().itunesCountry;
   const countries={...ITUNES_COUNTRIES};
   if(!countries[current]) countries[current]=current;
@@ -103,19 +103,27 @@ function openCoverSettings(){
 }
 function closeCoverSettings(){$('coverSettingsModal')?.classList.remove('active');}
 function saveCoverSettings(){
-  const oldKey=getTmdbKey(), oldCountry=getCoverSettings().itunesCountry;
+  const oldKey=getTmdbKey(), oldCountry=getCoverSettings().itunesCountry;   // effective key: user key or built-in
   const key=String($('tmdbKeyInput').value||'').trim().replace(/^bearer\s+/i,'').replace(/^["']|["']$/g,'');
   const country=($('itunesCountrySelect').value || 'US').toUpperCase();
   coverLsSet(TMDB_KEY_STORAGE, key);
   coverLsSet(ITUNES_COUNTRY_STORAGE, country);
   closeCoverSettings();
   tmdbRejected=false;
-  if(key!==oldKey || country!==oldCountry) clearCoverCache();   // different provider/region: old "no match" answers no longer apply
+  if(getTmdbKey()!==oldKey || country!==oldCountry) clearCoverCache();   // different provider/region: old "no match" answers no longer apply
   toast('Cover settings saved.');
-  if(key && key!==oldKey) tmdbRequest('/configuration', {}, key).then(()=>toast('TMDB key verified.'), ()=>{/* a 401 already showed its own message */});
+  if(key && getTmdbKey()!==oldKey) tmdbRequest('/configuration', {}, key).then(()=>toast('TMDB key verified.'), ()=>{/* a 401 already showed its own message */});
   if(posterPickerState) refreshPickerCandidates(els.pickerSearchInput.value.trim());
 }
-function getTmdbKey(){return String(coverLsGet(TMDB_KEY_STORAGE) || '').trim();}
+// Built-in TMDB key, used when no key of your own is saved in Cover settings. It is XOR-scrambled only so it is not a plain-text
+// match in the public repo; a browser has to send it to TMDB, so anyone can still read it there. Replace it if it is ever revoked.
+const TMDB_BUILTIN_KEY = 'eVgXS0tFdxxEIlgQWUoSUFsLXSpTQkNBFCAaRCUARF4=';
+function builtinTmdbKey(){
+  try{const salt='Harry A. Davis 1998', raw=atob(TMDB_BUILTIN_KEY); let key=''; for(let i=0;i<raw.length;i++) key+=String.fromCharCode(raw.charCodeAt(i)^salt.charCodeAt(i%salt.length)); return key;}
+  catch(_){return '';}
+}
+function getUserTmdbKey(){return String(coverLsGet(TMDB_KEY_STORAGE) || '').trim();}
+function getTmdbKey(){return getUserTmdbKey() || builtinTmdbKey();}
 function clearCoverCache(){
   let removed=0;
   try{
