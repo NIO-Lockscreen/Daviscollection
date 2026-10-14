@@ -494,7 +494,7 @@ body.remoteMode .topbar,body.remoteMode .tabs,body.remoteMode .rsPill{display:no
 .movieGrid.compact .rowWhere{grid-column:3;justify-self:end;display:flex;gap:8px;align-items:baseline;min-width:0;max-width:min(50vw,520px);color:var(--muted);font-size:.8rem;white-space:nowrap}
 .rowShelf{min-width:0;overflow:hidden;text-overflow:ellipsis}
 .rowFmt{flex:none}
-.rowFmt:before{content:"·";margin-right:8px}
+.rowShelf+.rowFmt:before{content:"·";margin-right:8px}   /* only when the shelf name is shown before it */
 .movieGrid.compact .placeBtn{grid-column:4}
 /* "By shelf" headings (cover and list view) */
 .shelfHead{grid-column:1/-1;margin:10px 4px 0;padding:0 0 6px;font-size:.95rem;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--text);border-bottom:1px solid var(--line)}

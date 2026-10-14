@@ -403,7 +403,7 @@ function cardHtml(m, dupeCount){
   const placeBtn = isToBeSorted(m.section) ? `<button class="miniBtn placeBtn" data-place="${id}">Place on shelf</button>` : '';
   if(compact){
     return `<article class="${cls}" data-id="${id}" data-needs-poster="${needsPoster?'true':'false'}" style="--hue:${hue}">${selBox}
-      <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><span class="rowWhere"><span class="rowShelf">${escapeHtml(m.section)}</span> <span class="rowFmt">${escapeHtml(m.format)}</span></span><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${checkChip}${seenChip}${removedChip}${dupe}${barcode}</div><div class="formatBadge">${escapeHtml(m.format)}</div>${placeBtn}</div>
+      <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><span class="rowWhere">${els.sortSelect.value==='shelf' ? '' : `<span class="rowShelf">${escapeHtml(m.section)}</span> `}<span class="rowFmt">${escapeHtml(m.format)}</span></span><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${checkChip}${seenChip}${removedChip}${dupe}${barcode}</div><div class="formatBadge">${escapeHtml(m.format)}</div>${placeBtn}</div>
     </article>`;
   }
   const img = m.poster ? `<img src="${escapeHtml(m.poster)}" alt="Cover for ${escapeHtml(m.title)}" loading="lazy" onerror="this.remove()">` : '';
