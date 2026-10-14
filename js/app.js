@@ -1,5 +1,7 @@
 const STORAGE_KEY = 'movieVault.privateCollection.v1';
 const UNSORTED_SECTION = 'UNSORTED / NOT PLACED';
+// True for shelves whose titles are still waiting for a permanent place. Card markup, counters and the Unsorted filter all ask this.
+function isToBeSorted(section){return section===UNSORTED_SECTION;}
 const formats = ['All formats','4K UHD','4K Steelbook','Blu-ray','DVD','TV / Series','Blu-ray / DVD','Box set'];
 const els = {};
 let state = loadState();
@@ -312,7 +314,7 @@ function cardHtml(m, dupeCount){
   const isSel = selectMode && selected.has(m.id);
   const selBox = selectMode ? `<input type="checkbox" class="selBox" tabindex="-1" aria-label="Select ${escapeHtml(m.title)}"${isSel?' checked':''}>` : '';
   const cls = isSel ? 'card selected' : 'card';
-  const placeBtn = m.section===UNSORTED_SECTION ? `<button class="miniBtn placeBtn" data-place="${id}">Place on shelf</button>` : '';
+  const placeBtn = isToBeSorted(m.section) ? `<button class="miniBtn placeBtn" data-place="${id}">Place on shelf</button>` : '';
   if(compact){
     return `<article class="${cls}" data-id="${id}" data-needs-poster="${needsPoster?'true':'false'}" style="--hue:${hue}">${selBox}
       <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${checkChip}${seenChip}${removedChip}${dupe}${barcode}</div><div class="formatBadge">${escapeHtml(m.format)}</div>${placeBtn}</div>
