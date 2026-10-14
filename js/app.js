@@ -25,6 +25,7 @@ function init(){
   ['sectionFilter','formatFilter','seenFilter','sortSelect'].forEach(id=>els[id].addEventListener('input', renderFresh));
   els.movieGrid.addEventListener('click', onGridClick);   // one delegated handler for every card button (covers.js buttons carry the same data-* attributes)
   els.clearFiltersBtn.addEventListener('click', clearFilters);
+  $('filtersToggle').addEventListener('click',()=>setFiltersOpen(!$('controls').classList.contains('filtersOpen')));
   els.selectToggle.addEventListener('click',()=>setSelectMode(!selectMode));
   els.selectAllBtn.addEventListener('click', toggleSelectAll);
   els.selectMoveBtn.addEventListener('click',()=>openShelfPicker([...selected]));
@@ -45,9 +46,10 @@ function init(){
   els.viewToggle.textContent=compact?'Cover view':'List view';
   els.viewToggle.addEventListener('click',()=>{compact=!compact; localStorage.setItem('movieVault.viewMode', compact?'list':'cover'); els.viewToggle.textContent=compact?'Cover view':'List view'; renderFresh();});
   els.unsortedBtn.addEventListener('click',()=>{setSectionFilter(UNSORTED_SECTION); renderFresh(); showScreen('library');});
-  els.collectionValueStat.addEventListener('dblclick',openValueModal);
+  els.collectionValueStat.addEventListener('click',openValueModal);   // one click or tap opens it; a double-click does too
+  els.collectionValueStat.addEventListener('keydown',e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault(); openValueModal();}});
   els.valueCloseBtn.addEventListener('click',closeValueModal);
-  els.valueModal.addEventListener('click',e=>{if(e.target===els.valueModal) closeValueModal();});
+  els.valueModal.addEventListener('click',e=>{if(e.target===els.valueModal && Date.now()-valueOpenedAt>600) closeValueModal();});   // (the 2nd click of a double-click lands on the backdrop)
   ['valueMode','valueAmount','valueNote','valueConfirm'].forEach(id=>els[id].addEventListener('input',updateValuePreview));
   els.applyValueBtn.addEventListener('click',applyValueChange);
   els.rollbackValueBtn.addEventListener('click',rollbackLastValueChange);
@@ -77,7 +79,7 @@ function init(){
   els.removePosterBtn.addEventListener('click',()=>{if(editingId) removePoster(editingId,{keepModal:true});});
   els.editPosterLookupBtn.addEventListener('click',()=>lookupPosterForForm('edit'));
   ['editMovieTitle','editPoster','editSection','editFormat','editBarcode','editSeen'].forEach(id=>els[id].addEventListener('input',()=>updateEditPreview()));
-  window.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal(); closePosterPicker(); closeValueModal(); closeShelfPicker();}});
+  window.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal(); closePosterPicker(); closeValueModal(); closeShelfPicker(); if(els.backupMenu.classList.contains('open')){closeBackupMenu(); els.backupMenuBtn.focus();}}});
   initBackupUi();
   populateSelects();
   if(!initRemoteScan()) showCollectionView();   // a phone paired through a QR code shows only the remote scanner: no collection render, no cover lookups
@@ -151,13 +153,59 @@ function setSectionFilter(sec){
   if(sec!=='all' && ![...els.sectionFilter.options].some(o=>o.value===sec)) els.sectionFilter.add(new Option(sec,sec));   // rebuilt with its count by the next render
   els.sectionFilter.value=sec;
 }
+/* ---------- Search: forgiving matching ----------
+   "daddys home" finds DADDY’S HOME, "godfather 2" finds ... PART II, "spiderman" finds SPIDER-MAN. */
+const ROMAN_DIGIT={ii:'2',iii:'3',iv:'4',v:'5',vi:'6',vii:'7',viii:'8',ix:'9',x:'10'};
+// Lowercase, accents stripped, apostrophes and quotes dropped, & read as "and", all other punctuation a space.
+function searchBase(text){
+  return String(text==null?'':text).toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g,'').replace(/\u00f8/g,'o').replace(/\u00e6/g,'ae')
+    .replace(/['`\u00b4"\u2018\u2019\u201c\u201d\u02bc\u2032]/g,'').replace(/&/g,' and ').replace(/[^\p{L}\p{N}]+/gu,' ').trim();
+}
+// searchBase plus: roman numerals II-X as digits, the words "part"/"pt" dropped.
+function normalizeForSearch(text){
+  return searchBase(text).split(' ').map(w=>ROMAN_DIGIT[w]||w).filter(w=>w && w!=='part' && w!=='pt').join(' ');
+}
+function parseSearchQuery(text){   // null when nothing searchable is typed
+  const t=normalizeForSearch(text) || searchBase(text); if(!t) return null;   // (a lone "part" is searched as typed, not dropped)
+  return {text:t, words:t.split(' '), sq:searchBase(text).replace(/ /g,''), sqn:t.replace(/ /g,'')};
+}
+const searchCache=new Map();   // movie id -> prepared fields, rebuilt when the movie's text changed
+const searchEntryProto={
+  // Every query word is in the blob (title, shelf, format, barcode, notes; 1-2 digit numbers as whole words, so "2" is not "12" or "26246"),
+  // or the squashed query sits inside the squashed title ("spiderman" in SPIDER-MAN, "xmen" in X-MEN).
+  includes(q){
+    return q.words.every(w=>/^\d{1,2}$/.test(w) ? this.blobWords.has(w) : this.blob.includes(w)) || this.sq.includes(q.sq) || this.sqn.includes(q.sqn);
+  }
+};
+function searchEntry(m){
+  const raw=[m.title,m.section,m.format,m.barcode,m.notes].join('\u0001');
+  let e=searchCache.get(m.id);
+  if(!e || e.raw!==raw){
+    const title=normalizeForSearch(m.title), blob=normalizeForSearch(raw);
+    e=Object.assign(Object.create(searchEntryProto),{raw, blob, blobWords:new Set(blob.split(' ')), title, words:new Set(title.split(' ')), sq:searchBase(m.title).replace(/ /g,''), sqn:title.replace(/ /g,'')});
+    searchCache.set(m.id,e);
+  }
+  return e;
+}
+// Title A-Z with a search: exact title, then titles starting with it, then titles holding every word as a whole word, then the rest. `list` is already A-Z, so each group keeps that order.
+function rankByTitleMatch(list,q){
+  const groups=[[],[],[],[]];
+  list.forEach(m=>{
+    const e=searchEntry(m);
+    const g = e.title===q.text || e.sq===q.sq || e.sqn===q.sqn ? 0
+      : e.title.startsWith(q.text) || e.sq.startsWith(q.sq) || e.sqn.startsWith(q.sqn) ? 1
+      : q.words.every(w=>e.words.has(w)) ? 2 : 3;
+    groups[g].push(m);
+  });
+  return groups.flat();
+}
 function getFiltered(dupes=getDuplicateMap()){
-  const q=els.searchInput.value.trim().toLowerCase();
+  const q=parseSearchQuery(els.searchInput.value);   // null when empty; matching and ranking live in the search functions above
   const sec=els.sectionFilter.value;
   const fmt=els.formatFilter.value;
   const seen=els.seenFilter.value;
   let list=state.movies.filter(m=>{
-    const searchBlob=[m.title,m.section,m.format,m.barcode,m.notes].join(' ').toLowerCase();
+    const searchBlob=q ? searchEntry(m) : null;   // .includes(q) below = forgiving match, see searchEntryProto
     const dupeCount=dupes[titleKey(m.title)]||0;
     const duplicateOk = !duplicatesOnly || dupeCount>1;
     const seenOk = seen==='all' || (seen==='seen' && m.seen!==false) || (seen==='unseen' && m.seen===false);
@@ -175,6 +223,7 @@ function getFiltered(dupes=getDuplicateMap()){
     if(sort==='dupes-first') return ((dupes[titleKey(b.title)]||0)-(dupes[titleKey(a.title)]||0)) || a.title.localeCompare(b.title);
     return a.title.localeCompare(b.title);
   });
+  if(q && sort==='title-asc') list=rankByTitleMatch(list,q);
   return list;
 }
 // Cards are added in batches: FIRST_BATCH now, NEXT_BATCH each time #gridSentinel nears the viewport.
@@ -182,6 +231,7 @@ function getFiltered(dupes=getDuplicateMap()){
 function renderFresh(){render({reset:true});}
 function render(opts){
   const keep = opts && opts.reset ? 0 : viewShown;
+  updateChrome();
   updateSectionFilter();
   const dupes=getDuplicateMap(), list=getFiltered(dupes);
   viewList=list; viewDupes=dupes; viewShown=0;
@@ -226,13 +276,24 @@ function onGridClick(e){
   if(selectMode){toggleSelect(id); return;}
   const btn=e.target.closest('button'), d=btn ? btn.dataset : null;
   if(!btn){openEdit(id); return;}
-  if(d.edit) openEdit(d.edit);
-  else if(d.toggleSeen) toggleSeen(d.toggleSeen);
-  else if(d.searchposter) quickPosterLookup(d.searchposter);
-  else if(d.removePoster) removePoster(d.removePoster);
+  if(d.toggleSeen) toggleSeen(d.toggleSeen);
   else if(d.wrongCover) wrongCover(d.wrongCover);
   else if(d.keepCover) keepCover(d.keepCover);
   else if(d.place) openShelfPicker([d.place]);
+}
+
+// Phone: the filter selects sit behind a "Filters" button (CSS shows the button and hides the panel only on narrow screens).
+function setFiltersOpen(open){
+  $('controls').classList.toggle('filtersOpen', open);
+  $('filtersToggle').setAttribute('aria-expanded', open?'true':'false');
+}
+// Header line ("Harry A. Davis · 2,330 titles on 31 shelves") and the active-filter count on the Filters button; runs on every render.
+function updateChrome(){
+  const n=state.movies.length, shelves=new Set(state.movies.filter(m=>!isToBeSorted(m.section)).map(m=>m.section)).size;
+  $('subtitle').textContent = `Harry A. Davis · ${n.toLocaleString()} title${n===1?'':'s'}`+(shelves ? ` on ${shelves.toLocaleString()} ${shelves===1?'shelf':'shelves'}` : '');
+  const active=(els.sectionFilter.value!=='all')+(els.formatFilter.value!=='All formats')+(els.seenFilter.value!=='all'), badge=$('filtersBadge');
+  badge.hidden=!active; badge.textContent=active;
+  $('filtersToggle').setAttribute('aria-label', active ? `Filters, ${active} active` : 'Filters');
 }
 
 function isFilterActive(){
@@ -309,7 +370,6 @@ function cardHtml(m, dupeCount){
   const seenChip = m.seen===false ? '<span class="chip unseenPill">Not seen</span>' : '<span class="chip seenPill">Seen</span>';
   const removedChip = (!m.poster && m.posterRemoved===true) ? '<span class="chip posterRemovedPill">Poster removed</span>' : '';
   const checkChip = coverChipHtml(m);
-  const seenBtn = m.seen===false ? 'Mark seen' : 'Mark unseen';
   const needsPoster = !m.poster && m.posterRemoved!==true;
   const isSel = selectMode && selected.has(m.id);
   const selBox = selectMode ? `<input type="checkbox" class="selBox" tabindex="-1" aria-label="Select ${escapeHtml(m.title)}"${isSel?' checked':''}>` : '';
@@ -321,15 +381,17 @@ function cardHtml(m, dupeCount){
     </article>`;
   }
   const img = m.poster ? `<img src="${escapeHtml(m.poster)}" alt="Cover for ${escapeHtml(m.title)}" loading="lazy" onerror="this.remove()">` : '';
-  const posterBtn = m.poster
-    ? `<button class="miniBtn" data-remove-poster="${id}">Remove poster</button>`
-    : `<button class="miniBtn" data-searchposter="${id}">${m.posterRemoved===true?'Choose poster':'Find poster'}</button>`;
+  const seen = m.seen!==false, sv = seenToggleAttrs(seen);   // the whole card opens the details dialog (Edit, Find / Remove poster live there); only the seen toggle, Place on shelf and Keep / Wrong cover? stay on the card
   const coverBtns = coverButtonsHtml(m);   // Keep / Wrong cover? only on covers flagged by "Check old covers", see covers.js
   const extra = placeBtn || coverBtns ? `<div class="cardExtra">${placeBtn}${coverBtns}</div>` : '';
   return `<article class="${cls}" data-id="${id}" data-needs-poster="${needsPoster?'true':'false'}" style="--hue:${hue}">${selBox}
     <div class="cover">${img}<div class="coverTitle">${escapeHtml(shortCoverTitle(m.title))}</div><div class="formatBadge">${escapeHtml(m.format)}</div></div>
-    <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${checkChip}${seenChip}${removedChip}${dupe}${barcode}</div>${m.notes?`<div class="notes">${escapeHtml(m.notes)}</div>`:''}<div class="cardActions"><button class="miniBtn" data-toggle-seen="${id}">${seenBtn}</button><button class="miniBtn" data-edit="${id}">Edit</button>${posterBtn}</div>${extra}</div>
+    <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${checkChip}${removedChip}${dupe}${barcode}</div>${m.notes?`<div class="notes">${escapeHtml(m.notes)}</div>`:''}<div class="cardActions"><button type="button" class="${sv.cls}" data-toggle-seen="${id}" aria-pressed="${seen}" title="${sv.title}">${sv.text}</button></div>${extra}</div>
   </article>`;
+}
+// Look of the seen toggle on a card; toggleSeen() repaints an existing button from the same values.
+function seenToggleAttrs(seen){
+  return seen ? {cls:'seenToggle seenPill', text:'Seen ✓', title:'Seen. Tap to mark as not seen.'} : {cls:'seenToggle unseenPill', text:'Not seen', title:'Not seen yet. Tap to mark as seen.'};
 }
 function shortCoverTitle(t){return t.length>52 ? t.slice(0,49)+'…' : t}
 
@@ -369,6 +431,7 @@ function openEdit(id){
   editingId=id;
   els.editMovieTitle.value=m.title; els.editSection.value=m.section; els.editCustomSection.value=''; els.editFormat.value=m.format; els.editBarcode.value=m.barcode; els.editSeen.checked=m.seen!==false; els.editPoster.value=m.poster; els.editNotes.value=m.notes;
   updateEditPreview();
+  $('editAdvanced').open=false;
   els.editModal.classList.add('active');
 }
 function updateEditPreview(){
@@ -382,9 +445,16 @@ function updateEditPreview(){
   const currentMovie = editingId ? state.movies.find(x=>x.id===editingId) : null;
   const posterRemoved = !poster && currentMovie?.posterRemoved === true;
   const cover=poster ? `<div class="modalCover"><img src="${escapeHtml(poster)}" alt="Cover for ${escapeHtml(title)}" onerror="this.parentElement.textContent='No cover';"></div>` : `<div class="modalCover">${escapeHtml(shortCoverTitle(title))}</div>`;
-  const posterHint = posterRemoved ? 'Poster removed. Auto cover loading is disabled until you choose a new poster.' : `Click “${poster?'Change':'Find'} poster” to search again, or paste a cover URL manually.`;
+  const posterHint = posterRemoved ? 'Poster removed. Auto cover loading is disabled until you choose a new poster.' : `Click “${poster?'Change':'Find'} poster” to search again, or paste a cover URL under Advanced.`;
   els.editPosterLookupBtn.textContent = poster ? 'Change poster' : 'Find poster';
-  els.editPreview.innerHTML = `${cover}<div class="modalPreviewInfo"><strong style="color:var(--text)">${escapeHtml(title)}</strong><br>${escapeHtml(section || 'No section')} · ${escapeHtml(format || 'No format')} · ${escapeHtml(seen)}${barcode?`<br>Barcode: ${escapeHtml(barcode)}`:''}<br><span>${escapeHtml(posterHint)}</span></div>`;
+  els.removePosterBtn.hidden = !poster;   // nothing to remove without a poster
+  const added = formatAdded(currentMovie?.added);
+  els.editPreview.innerHTML = `${cover}<div class="modalPreviewInfo"><strong style="color:var(--text)">${escapeHtml(title)}</strong><br>${escapeHtml(section || 'No section')} · ${escapeHtml(format || 'No format')} · ${escapeHtml(seen)}${barcode?`<br>Barcode: ${escapeHtml(barcode)}`:''}${added?`<br>Added ${escapeHtml(added)}`:''}<br><span>${escapeHtml(posterHint)}</span></div>`;
+}
+function formatAdded(iso){   // "2026-05-14" -> "14 May 2026"
+  if(!iso) return '';
+  const d=new Date(iso+'T00:00:00');
+  return isNaN(d) ? String(iso) : d.toLocaleDateString('en-GB',{day:'numeric', month:'short', year:'numeric'});
 }
 function closeModal(){els.editModal.classList.remove('active'); editingId=null;}
 function saveEdit(){
@@ -420,7 +490,13 @@ function toggleSeen(id){
   const m=state.movies.find(x=>x.id===id); if(!m) return;
   m.seen = m.seen===false ? true : false;
   m.updated=today();
-  save(); render();
+  save();
+  const btn=cardById(id)?.querySelector('[data-toggle-seen]');
+  if(btn && els.seenFilter.value==='all' && els.sortSelect.value!=='unseen-first'){   // nothing moves: repaint the one button (no jump, keeps keyboard focus) and the counters
+    const sv=seenToggleAttrs(m.seen);
+    btn.className=sv.cls; btn.textContent=sv.text; btn.title=sv.title; btn.setAttribute('aria-pressed', String(m.seen));
+    populateStats();
+  }else render();
   toast(m.seen ? 'Marked as seen.' : 'Marked as not seen.');
 }
 /* ---------- Select mode + moving titles to a shelf ---------- */
@@ -536,7 +612,9 @@ function parseMoneyInput(value){
   const n=Number(cleaned);
   return Number.isFinite(n) ? Math.round(n) : NaN;
 }
+let valueOpenedAt=0;
 function openValueModal(){
+  valueOpenedAt=Date.now();
   els.valueAmount.value=''; els.valueNote.value=''; els.valueMode.value='add'; els.valueConfirm.checked=false;
   els.valueModal.classList.add('active');
   renderValueHistory(); updateValuePreview();

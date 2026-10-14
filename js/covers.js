@@ -495,11 +495,9 @@ function pumpAutoCoverQueue(){
 }
 /* Any provider answering HTTP 429 pauses the whole auto queue; the title that hit it is re-queued, not marked failed. */
 function noteCoverRateLimit(){
-  const wasPaused=Date.now()<autoCoverPausedUntil;
-  autoCoverPausedUntil=Date.now()+COVER_RATE_LIMIT_PAUSE_MS;
+  autoCoverPausedUntil=Date.now()+COVER_RATE_LIMIT_PAUSE_MS;   // no toast: Cover settings shows "paused N s (rate limit)" in the bulk / check progress
   clearTimeout(autoCoverResumeTimer);
   autoCoverResumeTimer=setTimeout(pumpAutoCoverQueue, COVER_RATE_LIMIT_PAUSE_MS+100);
-  if(!wasPaused) coverNotify('Cover lookups are rate-limited. Pausing for a minute…');
 }
 /* Returns 'found' | 'none' | 'skipped' | 'requeued'. The lookup itself is findAutoCover(); this only applies its answer. */
 async function autoLoadVisibleCover(id){
@@ -1416,19 +1414,6 @@ function markCardLoading(id,on){
   const cover=cardById(id)?.querySelector('.cover');
   if(cover) cover.classList.toggle('loading',!!on);
 }
-/* No click listeners here: app.js handles every data-* card button with one delegated handler on #movieGrid. */
-function cardPosterButton(id, hasPoster){
-  const btn=document.createElement('button');
-  btn.className='miniBtn';
-  if(hasPoster){
-    btn.dataset.removePoster=id;
-    btn.textContent='Remove poster';
-  }else{
-    btn.dataset.searchposter=id;
-    btn.textContent='Find poster';
-  }
-  return btn;
-}
 /* Redraws one card's "Check cover" chip and Keep / Wrong cover? buttons from the movie's current state (no full render). */
 function syncCardCoverFlags(id){
   const card=cardById(id), m=state.movies.find(x=>x.id===id);
@@ -1454,10 +1439,6 @@ function updateCardPoster(id,poster,title){
     else cover.insertAdjacentHTML('afterbegin', `<img src="${escapeHtml(poster)}" alt="Cover for ${escapeHtml(title)}" loading="lazy">`);   // a failing load is handled by onCoverImageError
   }
   card.querySelectorAll('.posterRemovedPill').forEach(chip=>chip.remove());
-  const findBtn=card.querySelector('[data-searchposter]');
-  const actions=card.querySelector('.cardActions');
-  if(findBtn) findBtn.replaceWith(cardPosterButton(id,true));
-  else if(actions && !actions.querySelector('[data-remove-poster]')) actions.appendChild(cardPosterButton(id,true));
   syncCardCoverFlags(id);   // "Check cover" / Keep / Wrong cover? depend on where the cover came from
 }
 function removePoster(id, opts={}){
@@ -1509,6 +1490,5 @@ function onCoverImageError(e){
   card.dataset.needsPoster='true';
   card.querySelectorAll('.cover img').forEach(i=>i.remove());
   markCardLoading(id,false);
-  card.querySelector('[data-remove-poster]')?.replaceWith(cardPosterButton(id,false));
   syncCardCoverFlags(id);
 }
