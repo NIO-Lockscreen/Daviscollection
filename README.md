@@ -13,13 +13,22 @@ Selve appen er på engelsk. Denne README-en er på norsk.
 - **Flytte mange på én gang.** Trykk **Select**, merk kortene, og bruk linja nederst: «Move to shelf…», «Mark seen» eller «Mark unseen». «Select all» merker alle titlene i det gjeldende filteret.
 - **Rask visning.** Kortene tegnes etter hvert som du blar, så samlingen åpner på et blunk også på mobil. Seksjonsfilteret viser antall titler per hylle, og «Clear filters» nullstiller søk og filtre.
 - **Sett / ikke sett.** Hver tittel kan merkes som sett. Filteret «Seen» og sorteringen «Unseen first» gjør det enkelt å finne noe du ikke har sett ennå.
-- **Strekkodeskanning på mobil.** Fanen «Add / scan» bruker kameraet til å lese strekkoden på plata, og kan slå opp et tittelforslag. Kameraet krever https eller localhost, så det virker på den publiserte siden, men ikke hvis du åpner `index.html` direkte fra disk. Ved feilsøk får du en lenke for å google strekkoden.
+- **Strekkodeskanning på mobil.** Fanen «Add / scan» bruker kameraet til å lese strekkoden på plata, og kan slå opp et tittelforslag. Kameraet krever https eller localhost, så det virker på den publiserte siden, men ikke hvis du åpner `index.html` direkte fra disk. Ved feilsøk får du en lenke for å google strekkoden. Se «Strekkodeoppslag» under.
 - **Mobilen som skanner for PC-en.** På «Add / scan» på PC-en står det en QR-kode klar under **Scan with your phone**; du skanner den med mobilens vanlige kamera-app, og strekkodene du skanner på mobilen dukker opp live på PC-en. Se avsnittet «Mobilen som skanner for PC-en» under.
 - **Har jeg den allerede?** Når du skanner en strekkode eller skriver en tittel som allerede finnes i samlingen, sier appen fra med en gang («You already own this…» / «You already have…»). Det er nyttig i butikken.
 - **Angre.** Etter at du har slettet en film eller flyttet titler til en hylle, kan du angre i noen sekunder.
 - **Automatiske covers.** Se avsnittet «Coverbilder» under.
 - **«Blueprint»-eksport av samlelista.** Fanen «Blueprint export» lager en samleliste i samme stil som den gamle Word-lista: tittel øverst, seksjonsnavn og stjerne-punkter. Den kan lastes ned som HTML (kan åpnes i Word) eller TXT, eller skrives ut / lagres som PDF. Velg **All shelves** for hele lista, eller én hylle for å skrive ut bare den (nyttig når du rydder en hylle).
 - **Backup.** Menyen «Backup ▾» eksporterer hele samlingen som en JSON-fil (eller et regneark, CSV) og importerer den igjen. Ved import velger du **Merge** (slå sammen) eller **Replace all**, og «Undo last import» angrer. En rød prikk på Backup-knappen minner deg på å ta backup når det er endringer som ikke er sikret.
+
+## Strekkodeoppslag
+
+Når en strekkode er lest (eller skrevet inn og du trykker **Lookup barcode**), spør appen sin egen lille serverfunksjon på Vercel, `api/barcode.js`, om hvilken film det er. Funksjonen slår opp i den gratis tjenesten **upcitemdb** og, hvis den ikke kjenner koden, i **Open Product Facts**. Nettleseren kan ikke spørre upcitemdb direkte, fordi upcitemdb bare tillater forespørsler fra sin egen nettside (det var derfor appen tidligere sa «Could not reach the barcode service»).
+
+- **Svarene huskes på Vercel.** En kode som blir funnet huskes i 30 dager, og «ukjent kode» i ett døgn, så samme strekkode bruker ikke opp kvoten flere ganger.
+- **Dagskvote.** upcitemdb sin gratisversjon tillater ca. 100 oppslag per døgn. Når den er brukt opp, sier appen «Daily barcode lookup limit reached … Try again tomorrow». Strekkoden står fortsatt i feltet, så du kan legge til filmen med tittel selv, eller slå den opp i morgen.
+- **Ukjent kode.** Mange europeiske Blu-ray-/DVD-utgaver finnes ikke i de gratis databasene. Da får du «No product data found» og en lenke som googler strekkoden; skriv inn tittelen selv.
+- Funksjonen finnes bare på Vercel. På GitHub Pages, med `python3 -m http.server` eller med `index.html` åpnet fra disk prøver appen upcitemdb direkte, og det stopper nettleseren som regel. Lokalt kan du bruke `npx vercel dev` hvis du vil teste oppslaget.
 
 ## Mobilen som skanner for PC-en
 
@@ -68,6 +77,7 @@ Feilsøking:
 GitHub-repoet har `https://daviscollection.vercel.app` som hjemmeside, og siden publiseres fra Vercel rett fra `main`-grenen.
 
 - **Oppdatering skjer automatisk.** Når du pusher eller merger til `main`, lager Vercel en ny utgave av siden av seg selv, vanligvis på under ett minutt. Det er ingenting å bygge: filene serveres akkurat som de ligger i repoet.
+- **Serverfunksjonen.** Mappa `api/` inneholder én serverfunksjon (`api/barcode.js`, strekkodeoppslaget). Vercel finner den selv og publiserer den på `/api/barcode`, uten noe oppsett eller nøkler.
 - **Ingen `vercel.json` er nødvendig.** Vercel sender `Cache-Control: public, max-age=0, must-revalidate` for statiske filer, så nettleseren sjekker alltid om det finnes en nyere versjon. Service workeren (`sw.js`) henter dessuten alltid ferske filer når du er på nett.
 - **Hvis en endring ikke dukker opp:** åpne prosjektet i Vercel-dashboardet og sjekk at siste deployment under «Deployments» er «Ready», og at Production Branch er `main`. Under Settings → Build and Deployment skal Framework Preset være «Other», og Output Directory skal stå tom (siden ligger i rotmappa).
 
@@ -162,6 +172,7 @@ js/seed-data.js        Startlista med titler (brukes bare første gang)
 js/storage.js          Lagring i localStorage, normalisering, JSON-backup, blueprint-eksport
 js/covers.js           Automatisk cover-oppslag og plakatvelgeren
 js/scanner.js          Strekkodeoppslag og kameraskanner
+api/barcode.js         Serverfunksjon på Vercel: slår opp strekkoder (upcitemdb, Open Product Facts) og husker svarene
 js/remote-scan.js      Mobilen som skanner for PC-en (QR-kode, ntfy.sh-relay, kø med skannede koder)
 js/app.js              Tilstand, oppstart, visning av kort, redigering og verdi
 js/pwa.js              Registrerer service workeren (bare på http/https, ikke fra fil)

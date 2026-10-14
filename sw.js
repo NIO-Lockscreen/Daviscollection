@@ -8,7 +8,7 @@
  * To force every installed copy to refresh its precache, bump CACHE_VERSION below.
  * All paths are relative, so the app works both at the domain root and under /<repo-name>/.
  */
-const CACHE_VERSION = 'v3';
+const CACHE_VERSION = 'v4';
 const CACHE = 'movie-vault-' + CACHE_VERSION;
 
 const SHELL = [
@@ -55,6 +55,7 @@ self.addEventListener('fetch', event => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
   if (url.origin !== self.location.origin) return; // cross-origin: leave to the browser
+  if (url.pathname.includes('/api/')) return;       // live lookups (api/barcode): never cached for offline use
   event.respondWith(networkFirst(event, req));
 });
 

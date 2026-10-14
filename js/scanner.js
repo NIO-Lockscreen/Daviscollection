@@ -1,6 +1,6 @@
 /* ---------- Barcode lookup + camera scanner ---------- */
 const LOOKUP_URL='https://api.upcitemdb.com/prod/trial/lookup?upc=';
-const LOOKUP_TIMEOUT_MS=8000;
+const LOOKUP_TIMEOUT_MS=12000;
 const NATIVE_FORMATS=['ean_13','ean_8','upc_a','upc_e','code_128','code_39'];
 const NATIVE_MAX_ERRORS=10;      // consecutive detect() errors before giving up on the native detector
 const QUAGGA_URL='https://cdn.jsdelivr.net/npm/@ericblade/quagga2@1.8.4/dist/quagga.min.js';
@@ -89,6 +89,12 @@ function hideSearchFallback(){const box=$('scanFallback'); if(box) box.hidden=tr
 /* Asks upcitemdb about a barcode. Never throws, has its own timeout, and signal (optional) cancels it.
    Returns {ok:true,item,title,poster,notes} or {ok:false,kind,msg,status?}.
    kind: rate | server | refused | unreadable | service | none | timeout | network | aborted (aborted = the caller's signal fired). */
+// upcitemdb's CORS header only allows its own website, so a browser can't call it from here. On the website the app
+// asks its own Vercel function (api/barcode.js), which looks the code up server-side and caches the answer. Opened from
+// a file there is no server, so it tries upcitemdb directly (which the browser will usually block).
+function barcodeLookupUrl(code){
+  return (/^https?:$/.test(location.protocol) ? 'api/barcode?upc=' : LOOKUP_URL)+encodeURIComponent(code);
+}
 async function fetchBarcodeInfo(code, signal){
   code=normalizeBarcode(code);
   const ctl=new AbortController(), fail=(kind,msg,status)=>({ok:false,kind,msg,status});
@@ -97,7 +103,9 @@ async function fetchBarcodeInfo(code, signal){
   let timedOut=false;
   const timer=setTimeout(()=>{timedOut=true; ctl.abort();},LOOKUP_TIMEOUT_MS);
   try{
-    const res=await fetch(LOOKUP_URL+encodeURIComponent(code),{signal:ctl.signal});
+    let res=await fetch(barcodeLookupUrl(code),{signal:ctl.signal});
+    // Hosted somewhere without the function (plain static server): fall back to asking upcitemdb directly.
+    if(res.status===404 && !res.headers.get('content-type')?.includes('json')) res=await fetch(LOOKUP_URL+encodeURIComponent(code),{signal:ctl.signal});
     if(!res.ok){
       if(res.status===429) return fail('rate','Daily barcode lookup limit reached (the free service allows only about 100 a day). Try again tomorrow.',429);
       if(res.status>=500) return fail('server',`Barcode service is down or busy right now (HTTP ${res.status}).`,res.status);
