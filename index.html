@@ -29,7 +29,7 @@
       <div class="logo" aria-hidden="true"></div>
       <div>
         <h1>Movie Vault</h1>
-        <p class="subtitle">Private Blu-ray, 4K and DVD collection manager built from your existing section blueprint. Desktop opens as a collection browser; phone opens in fast add / barcode mode.</p>
+        <p class="subtitle" id="subtitle">Harry A. Davis · your movie collection</p>
       </div>
     </div>
     <div class="toolbar">
@@ -60,20 +60,23 @@
       <div class="stat" id="totalStat"><small id="totalLabel">Total titles</small><strong id="totalCount">0</strong></div>
       <div class="stat clickable" id="duplicatesStat" role="button" tabindex="0" aria-pressed="false" title="Click to show only titles you own multiple copies of"><small>Duplicates</small><strong id="duplicateCount">0</strong><span class="micro" id="duplicateMicro">Click to filter</span></div>
       <div class="stat clickable" id="smartFilterStat" role="button" tabindex="0" aria-pressed="false" title="Click to filter the titles that are waiting to be sorted onto a shelf, or unseen titles when nothing is waiting"><small id="smartFilterLabel">To sort</small><strong id="fourKCount">0</strong><span class="micro" id="smartFilterMicro">Click to filter</span></div>
-      <div class="stat clickable" id="collectionValueStat" title="Double click to edit collection value"><small>Total collection value</small><strong id="collectionValue">0 kr</strong><span class="micro">Double-click to edit</span></div>
+      <div class="stat clickable" id="collectionValueStat" role="button" tabindex="0" title="Click to edit the collection value"><small>Total collection value</small><strong id="collectionValue">0 kr</strong><span class="micro">Click to edit</span></div>
     </section>
 
-    <section class="controls" aria-label="Filters and sorting">
-      <div class="field"><label for="searchInput">Search title, barcode or notes</label><input id="searchInput" type="search" placeholder="Search collection…"></div>
-      <div class="field"><div class="labelRow"><label for="sectionFilter">Section</label><button type="button" class="linkBtn" id="shelvesBtn" title="Rename, merge, reorder or remove shelves">Shelves</button></div><select id="sectionFilter"></select></div>
-      <div class="field"><label for="formatFilter">Format</label><select id="formatFilter"></select></div>
-      <div class="field"><label for="seenFilter">Seen</label><select id="seenFilter"><option value="all">Seen + unseen</option><option value="unseen">Not seen yet</option><option value="seen">Seen</option></select></div>
-      <div class="field"><label for="sortSelect">Sort</label><select id="sortSelect"><option value="title-asc">Title A–Z</option><option value="title-desc">Title Z–A</option><option value="added-desc">Newest added</option><option value="unseen-first">Unseen first</option><option value="dupes-first">Duplicates first</option><option value="auto-first">Covers to review first</option><option value="shelf">By shelf</option></select></div>
-      <div class="toggleRow"><button class="ghost" id="unsortedBtn" title="Show every title that is still waiting for a shelf">To sort</button></div>
-      <div class="toggleRow"><button class="ghost" id="viewToggle">List view</button><button class="ghost" id="selectToggle" aria-pressed="false" title="Tick several titles, then move them to a shelf or mark them seen">Select</button></div>
+    <section class="controls" id="controls" aria-label="Search, filters and sorting">
+      <div class="field searchField"><label for="searchInput">Search title, barcode or notes</label><input id="searchInput" type="search" placeholder="Search your collection…"></div>
+      <button type="button" class="ghost filtersToggle" id="filtersToggle" aria-expanded="false" aria-controls="filterPanel">Filters<span class="filterBadge" id="filtersBadge" hidden>0</span></button>
+      <div class="filterPanel" id="filterPanel">
+        <div class="field"><div class="labelRow"><label for="sectionFilter">Section</label><button type="button" class="linkBtn" id="shelvesBtn" title="Rename, merge, reorder or remove shelves">Shelves</button></div><select id="sectionFilter"></select></div>
+        <div class="field"><label for="formatFilter">Format</label><select id="formatFilter"></select></div>
+        <div class="field"><label for="seenFilter">Seen</label><select id="seenFilter"><option value="all">Seen + unseen</option><option value="unseen">Not seen yet</option><option value="seen">Seen</option></select></div>
+        <div class="field"><label for="sortSelect">Sort</label><select id="sortSelect"><option value="title-asc">Title A–Z</option><option value="title-desc">Title Z–A</option><option value="added-desc">Newest added</option><option value="unseen-first">Unseen first</option><option value="dupes-first">Duplicates first</option><option value="auto-first">Covers to review first</option><option value="shelf">By shelf</option></select></div>
+        <div class="toggleRow"><button class="ghost" id="unsortedBtn" title="Show every title that is still waiting for a shelf">To sort</button></div>
+        <div class="toggleRow"><button class="ghost" id="viewToggle">List view</button><button class="ghost" id="selectToggle" aria-pressed="false" title="Tick several titles, then move them to a shelf or mark them seen">Select</button></div>
+      </div>
     </section>
 
-    <div class="listMeta"><span class="resultLine"><span id="resultText" aria-live="polite">Showing 0 titles</span><button class="ghost clearBtn" id="clearFiltersBtn" hidden>Clear filters</button></span><span>Tip: list view is blueprint-style. Click a title to open cover, section, seen-status, barcode and notes.</span></div>
+    <div class="listMeta"><span class="resultLine"><span id="resultText" aria-live="polite">Showing 0 titles</span><button class="ghost clearBtn" id="clearFiltersBtn" hidden>Clear filters</button></span></div>
     <section id="movieGrid" class="movieGrid"></section>
     <div id="gridSentinel" class="gridSentinel" aria-hidden="true"></div>
   </main>
@@ -94,7 +97,7 @@
 
       <div class="panel">
         <h2>Add a movie</h2>
-        <p>Scan the barcode on phone. New purchases start as <strong>UNSORTED / NOT PLACED</strong> until you move them into the collection. Everything is saved locally in this browser until you export/import a backup. To attach a cover, click <strong>Find poster</strong> and pick from the candidates.</p>
+        <p>Type the title, or scan the barcode with your phone. A new title waits on <strong>UNSORTED / NOT PLACED</strong> until you give it a shelf.</p>
         <div class="formGrid">
           <div class="field full"><label for="newTitle">Title</label><input id="newTitle" placeholder="Movie title" autocomplete="off"><div class="dupeNote" id="titleDupeNote" role="status" hidden></div></div>
           <div class="field"><label for="newSection">Section</label><select id="newSection"></select></div>
@@ -110,7 +113,6 @@
           <button class="ghost" id="barcodeLookupBtn">Lookup barcode</button>
           <button class="primary" id="addMovieBtn">Add to collection</button>
         </div>
-        <div class="hint">Scanner needs HTTPS or localhost. If permission is already allowed and it still fails, the app now tries back-camera, front/any-camera, native detection and the fallback scanner before giving up. Click <strong>Find poster</strong> to open a picker with cover candidates from Apple/iTunes and Wikipedia, or paste your own cover URL.</div>
       </div>
 
       <div class="panel">
@@ -174,7 +176,7 @@
 </div>
 
 <div class="modal" id="editModal" role="dialog" aria-modal="true" aria-labelledby="editTitle">
-  <div class="modalCard">
+  <div class="modalCard editCard">
     <div class="modalHead"><h2 id="editTitle">Movie details</h2><button class="ghost" id="closeModalBtn">Close</button></div>
     <div class="modalPreview" id="editPreview"></div>
     <div class="formGrid">
@@ -184,10 +186,10 @@
       <div class="field"><label for="editFormat">Format</label><select id="editFormat"><option>4K UHD</option><option>4K Steelbook</option><option>Blu-ray</option><option>DVD</option><option>TV / Series</option><option>Blu-ray / DVD</option><option>Box set</option></select></div>
       <div class="field"><label for="editBarcode">Barcode</label><input id="editBarcode" inputmode="numeric"></div>
       <div class="field full"><label class="checkLine"><input id="editSeen" type="checkbox"> Mark as seen</label></div>
-      <div class="field full"><label for="editPoster">Cover image URL</label><input id="editPoster"></div>
       <div class="field full"><label for="editNotes">Notes</label><textarea id="editNotes"></textarea></div>
+      <details class="full advanced" id="editAdvanced"><summary>Advanced</summary><div class="field"><label for="editPoster">Cover image URL</label><input id="editPoster"></div></details>
     </div>
-    <div class="actions">
+    <div class="actions stickyActions">
       <button class="danger" id="deleteMovieBtn">Delete</button>
       <button class="ghost" id="removePosterBtn">Remove poster</button>
       <button class="ghost" id="editPosterLookupBtn">Find poster</button>
