@@ -1,7 +1,10 @@
 const STORAGE_KEY = 'movieVault.privateCollection.v1';
 const UNSORTED_SECTION = 'UNSORTED / NOT PLACED';
-// True for shelves whose titles are still waiting for a permanent place. Card markup, counters and the Unsorted filter all ask this.
-function isToBeSorted(section){return section===UNSORTED_SECTION;}
+// True for shelves whose titles are still waiting for a permanent place: UNSORTED / NOT PLACED plus the shelves listed in state.toSortShelves (managed in the Shelves dialog).
+// Card markup, counters, the "To sort" filter and the Place-on-shelf picker all ask this.
+function isToBeSorted(section){return section===UNSORTED_SECTION || state.toSortShelves.includes(section);}
+const TOSORT_FILTER = '__tosort__';   // pseudo value of the Section filter: every shelf that is still waiting to be sorted
+const LAST_FORMAT_KEY = 'movieVault.lastFormat';
 const formats = ['All formats','4K UHD','4K Steelbook','Blu-ray','DVD','TV / Series','Blu-ray / DVD','Box set'];
 const els = {};
 let state = loadState();
@@ -11,6 +14,7 @@ let duplicatesOnly = false;
 let editingId = null;
 const FIRST_BATCH = 80, NEXT_BATCH = 100;        // cards rendered up front / per scroll step
 let viewList = [], viewDupes = {}, viewShown = 0; // current filtered list, its duplicate map, how many cards are in the DOM
+let viewGrouped = false, viewGroupN = new Map();    // "By shelf" sort: shelf headings are emitted between the cards; viewGroupN = titles per shelf in the current list
 let gridObserver = null, searchTimer = 0, sectionFilterSig = '';
 let selectMode = false, shelfIds = [], lastShelf = '';
 const selected = new Set();
@@ -44,7 +48,7 @@ function init(){
   els.smartFilterStat.addEventListener('keydown', e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault(); applySmartCountFilter();}});
   els.viewToggle.textContent=compact?'Cover view':'List view';
   els.viewToggle.addEventListener('click',()=>{compact=!compact; localStorage.setItem('movieVault.viewMode', compact?'list':'cover'); els.viewToggle.textContent=compact?'Cover view':'List view'; renderFresh();});
-  els.unsortedBtn.addEventListener('click',()=>{setSectionFilter(UNSORTED_SECTION); renderFresh(); showScreen('library');});
+  els.unsortedBtn.addEventListener('click',()=>{setSectionFilter(TOSORT_FILTER); renderFresh(); showScreen('library');});
   els.collectionValueStat.addEventListener('dblclick',openValueModal);
   els.valueCloseBtn.addEventListener('click',closeValueModal);
   els.valueModal.addEventListener('click',e=>{if(e.target===els.valueModal) closeValueModal();});
@@ -78,6 +82,7 @@ function init(){
   els.editPosterLookupBtn.addEventListener('click',()=>lookupPosterForForm('edit'));
   ['editMovieTitle','editPoster','editSection','editFormat','editBarcode','editSeen'].forEach(id=>els[id].addEventListener('input',()=>updateEditPreview()));
   window.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal(); closePosterPicker(); closeValueModal(); closeShelfPicker();}});
+  initShelves(); restoreLastFormat();
   initBackupUi();
   populateSelects();
   if(!initRemoteScan()) showCollectionView();   // a phone paired through a QR code shows only the remote scanner: no collection render, no cover lookups
@@ -126,34 +131,46 @@ function closeBackupMenu(){
   els.backupMenu.classList.remove('open');
   els.backupMenuBtn.setAttribute('aria-expanded','false');
 }
+function allShelves(){return [...new Set([...state.sectionOrder, UNSORTED_SECTION])];}   // every shelf in sectionOrder (the Shelves dialog sets that order)
 function populateSelects(){
-  const sections = [...new Set([UNSORTED_SECTION, ...state.sectionOrder])];
+  const sections = allShelves(), keepNew = els.newSection.value;
   updateSectionFilter();
   const addOptions = sections.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
   els.newSection.innerHTML = addOptions;
-  if(!els.newSection.value) els.newSection.value=UNSORTED_SECTION;
+  els.newSection.value = sections.includes(keepNew) ? keepNew : UNSORTED_SECTION;   // the shelf picked in the Add form survives a refresh of the lists
   els.editSection.innerHTML = addOptions;
   els.formatFilter.innerHTML = formats.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join('');
+  updateBlueprintShelves();
 }
 function getDuplicateMap(){const c={}; state.movies.forEach(m=>{const k=titleKey(m.title); if(k)c[k]=(c[k]||0)+1}); return c;}
 function sectionCounts(){const c={}; state.movies.forEach(m=>{c[m.section]=(c[m.section]||0)+1}); return c;}
-// Section filter lists only shelves that hold titles (with counts), in sectionOrder order; the currently selected shelf always stays listed.
+// How many titles are on shelves that are still waiting to be sorted.
+function toSortCount(counts=sectionCounts()){return [...new Set([UNSORTED_SECTION, ...state.toSortShelves])].reduce((n,s)=>n+(counts[s]||0),0);}
+// Section filter: "All sections", "To sort (n)" (every to-sort shelf together), then only the shelves that hold titles (with counts) in sectionOrder order. The selected entry always stays listed.
 function updateSectionFilter(){
   const counts=sectionCounts(), cur=els.sectionFilter.value || 'all';
-  const secs=[...new Set([UNSORTED_SECTION, ...state.sectionOrder])].filter(s=>counts[s] || s===cur);
-  const sig=secs.map(s=>s+'\t'+(counts[s]||0)).join('\n');
+  const secs=allShelves().filter(s=>counts[s] || s===cur);
+  const nSort=toSortCount(counts), showSort=nSort>0 || cur===TOSORT_FILTER;
+  const sig=(showSort ? nSort : '-')+'\n'+secs.map(s=>s+'\t'+(counts[s]||0)).join('\n');
   if(sig===sectionFilterSig) return;   // nothing to rebuild: same shelves, same counts
   sectionFilterSig=sig;
-  els.sectionFilter.innerHTML=['<option value="all">All sections</option>', ...secs.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)} (${counts[s]||0})</option>`)].join('');
+  els.sectionFilter.innerHTML=['<option value="all">All sections</option>', ...(showSort ? [`<option value="${TOSORT_FILTER}">To sort (${nSort})</option>`] : []), ...secs.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)} (${counts[s]||0})</option>`)].join('');
   els.sectionFilter.value=cur;
+  if(els.sectionFilter.value!==cur) els.sectionFilter.value='all';   // that shelf is gone (renamed, merged or deleted elsewhere)
 }
 function setSectionFilter(sec){
   if(sec!=='all' && ![...els.sectionFilter.options].some(o=>o.value===sec)) els.sectionFilter.add(new Option(sec,sec));   // rebuilt with its count by the next render
   els.sectionFilter.value=sec;
 }
+// Section clause of getFiltered: a shelf name, 'all', or TOSORT_FILTER (every shelf that is waiting to be sorted).
+function sectionMatcher(sec){
+  if(sec==='all') return ()=>true;
+  if(sec===TOSORT_FILTER){const set=new Set([UNSORTED_SECTION, ...state.toSortShelves]); return m=>set.has(m.section);}
+  return m=>m.section===sec;
+}
 function getFiltered(dupes=getDuplicateMap()){
   const q=els.searchInput.value.trim().toLowerCase();
-  const sec=els.sectionFilter.value;
+  const secOk=sectionMatcher(els.sectionFilter.value);
   const fmt=els.formatFilter.value;
   const seen=els.seenFilter.value;
   let list=state.movies.filter(m=>{
@@ -161,12 +178,14 @@ function getFiltered(dupes=getDuplicateMap()){
     const dupeCount=dupes[titleKey(m.title)]||0;
     const duplicateOk = !duplicatesOnly || dupeCount>1;
     const seenOk = seen==='all' || (seen==='seen' && m.seen!==false) || (seen==='unseen' && m.seen===false);
-    return (!q || searchBlob.includes(q)) && (sec==='all'||m.section===sec) && (fmt==='All formats'||m.format===fmt) && duplicateOk && seenOk;
+    return (!q || searchBlob.includes(q)) && secOk(m) && (fmt==='All formats'||m.format===fmt) && duplicateOk && seenOk;
   });
-  const allowedSorts = new Set(['title-asc','title-desc','added-desc','dupes-first','unseen-first','auto-first']);
+  const allowedSorts = new Set(['title-asc','title-desc','added-desc','dupes-first','unseen-first','auto-first','shelf']);
   const sort = allowedSorts.has(els.sortSelect.value) ? els.sortSelect.value : 'title-asc';
   if (els.sortSelect.value !== sort) els.sortSelect.value = sort;
+  const shelfRank = sort==='shelf' ? new Map(allShelves().map((s,i)=>[s,i])) : null;   // "By shelf": sectionOrder, then A–Z inside a shelf
   list.sort((a,b)=>{
+    if(shelfRank) return ((shelfRank.get(a.section)??1e9)-(shelfRank.get(b.section)??1e9)) || a.section.localeCompare(b.section) || a.title.localeCompare(b.title);
     if(sort==='title-asc') return a.title.localeCompare(b.title);
     if(sort==='title-desc') return b.title.localeCompare(a.title);
     if(sort==='added-desc') return (b.added||'').localeCompare(a.added||'') || b.id.localeCompare(a.id);
@@ -185,6 +204,8 @@ function render(opts){
   updateSectionFilter();
   const dupes=getDuplicateMap(), list=getFiltered(dupes);
   viewList=list; viewDupes=dupes; viewShown=0;
+  viewGrouped = els.sortSelect.value==='shelf'; viewGroupN = new Map();
+  if(viewGrouped) list.forEach(m=>viewGroupN.set(m.section,(viewGroupN.get(m.section)||0)+1));
   if(selected.size){const ids=new Set(list.map(m=>m.id)); [...selected].forEach(id=>{if(!ids.has(id)) selected.delete(id);});}
   populateStats(list, dupes);
   els.movieGrid.classList.toggle('compact',compact);
@@ -193,8 +214,8 @@ function render(opts){
   els.clearFiltersBtn.hidden = !isFilterActive();
   updateSelectBar();
   if(!list.length){
-    const placed = els.sectionFilter.value===UNSORTED_SECTION && !state.movies.some(m=>m.section===UNSORTED_SECTION);
-    els.movieGrid.innerHTML=`<div class="empty">${placed?'Nothing is unsorted: every title is on a shelf.':'No movies match this filter.'}${isFilterActive()?'<div><button class="ghost" data-clear-filters>Clear filters</button></div>':''}</div>`;
+    const placed = els.sectionFilter.value===TOSORT_FILTER && !state.movies.some(m=>isToBeSorted(m.section));
+    els.movieGrid.innerHTML=`<div class="empty">${placed?'Nothing is waiting to be sorted: every title is on a shelf.':'No movies match this filter.'}${isFilterActive()?'<div><button class="ghost" data-clear-filters>Clear filters</button></div>':''}</div>`;
     watchGridEnd();
     return;
   }
@@ -205,13 +226,18 @@ function appendCards(n){
   const end=Math.min(viewList.length, viewShown+n);
   if(end>viewShown){
     let html='';
-    for(let i=viewShown;i<end;i++){const m=viewList[i]; html+=cardHtml(m, viewDupes[titleKey(m.title)]||0);}
+    for(let i=viewShown;i<end;i++){
+      const m=viewList[i];
+      if(viewGrouped && (i===0 || viewList[i-1].section!==m.section)) html+=shelfHeadHtml(m.section);   // a batch may start in the middle of a shelf: then no new heading
+      html+=cardHtml(m, viewDupes[titleKey(m.title)]||0);
+    }
     els.movieGrid.insertAdjacentHTML('beforeend', html);
     viewShown=end;
   }
   watchGridEnd();
   setupVisibleCoverAutoload();   // re-callable: observes every .card[data-needs-poster="true"], including the new ones
 }
+function shelfHeadHtml(sec){return `<h2 class="shelfHead">${escapeHtml(sec)}<span class="shelfHeadN"> · ${(viewGroupN.get(sec)||0).toLocaleString()}</span></h2>`;}
 function watchGridEnd(){
   const more=viewShown<viewList.length;
   if(!('IntersectionObserver' in window)){if(more) appendCards(viewList.length); return;}
@@ -252,11 +278,10 @@ function clearFilters(){
   renderFresh();
 }
 function applySmartCountFilter(){
-  const unsortedCount = state.movies.filter(m=>m.section===UNSORTED_SECTION).length;
-  const mode = unsortedCount > 0 ? 'unsorted' : 'unseen';
+  const mode = toSortCount() > 0 ? 'unsorted' : 'unseen';
   if(mode==='unsorted'){
-    const alreadyActive = els.sectionFilter.value===UNSORTED_SECTION;
-    setSectionFilter(alreadyActive ? 'all' : UNSORTED_SECTION);
+    const alreadyActive = els.sectionFilter.value===TOSORT_FILTER;
+    setSectionFilter(alreadyActive ? 'all' : TOSORT_FILTER);
     if(!alreadyActive) els.seenFilter.value = 'all';
   }else{
     const alreadyActive = els.seenFilter.value==='unseen' && els.sectionFilter.value==='all';
@@ -287,19 +312,20 @@ function populateStats(filteredList, dupes){
   els.duplicatesStat.setAttribute('aria-pressed', duplicatesOnly ? 'true' : 'false');
   els.duplicateMicro.textContent = duplicatesOnly ? 'Showing duplicates · click to clear' : 'Click to filter';
 
-  const unsortedCount = state.movies.filter(m=>m.section===UNSORTED_SECTION).length;
+  const unsortedCount = toSortCount();   // every title on a shelf that is still waiting to be sorted
   const unseenCount = state.movies.filter(m=>m.seen===false).length;
   const smartMode = unsortedCount > 0 ? 'unsorted' : 'unseen';
   const smartCount = smartMode==='unsorted' ? unsortedCount : unseenCount;
   const smartActive = smartMode==='unsorted'
-    ? els.sectionFilter.value===UNSORTED_SECTION
+    ? els.sectionFilter.value===TOSORT_FILTER
     : els.seenFilter.value==='unseen' && els.sectionFilter.value==='all';
-  els.smartFilterLabel.textContent = smartMode==='unsorted' ? 'Unsorted' : 'Unseen';
+  const smartWhat = smartMode==='unsorted' ? 'titles to sort' : 'unseen';
+  els.smartFilterLabel.textContent = smartMode==='unsorted' ? 'To sort' : 'Unseen';
   els.fourKCount.textContent = smartCount.toLocaleString();
-  els.smartFilterMicro.textContent = smartActive ? `Showing ${smartMode} · click to clear` : `Click to filter ${smartMode}`;
+  els.smartFilterMicro.textContent = smartActive ? `Showing ${smartWhat} · click to clear` : `Click to filter ${smartWhat}`;
   els.smartFilterStat.classList.toggle('toggled', smartActive);
   els.smartFilterStat.setAttribute('aria-pressed', smartActive ? 'true' : 'false');
-  els.smartFilterStat.title = smartMode==='unsorted' ? 'Click to show unsorted titles' : 'Click to show unseen titles';
+  els.smartFilterStat.title = smartMode==='unsorted' ? 'Click to show the titles that are waiting to be sorted onto a shelf' : 'Click to show unseen titles';
   els.collectionValue.textContent=formatMoney(state.collectionValue || 0);
 }
 function cardHtml(m, dupeCount){
@@ -317,7 +343,7 @@ function cardHtml(m, dupeCount){
   const placeBtn = isToBeSorted(m.section) ? `<button class="miniBtn placeBtn" data-place="${id}">Place on shelf</button>` : '';
   if(compact){
     return `<article class="${cls}" data-id="${id}" data-needs-poster="${needsPoster?'true':'false'}" style="--hue:${hue}">${selBox}
-      <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${checkChip}${seenChip}${removedChip}${dupe}${barcode}</div><div class="formatBadge">${escapeHtml(m.format)}</div>${placeBtn}</div>
+      <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><span class="rowWhere"><span class="rowShelf">${escapeHtml(m.section)}</span> <span class="rowFmt">${escapeHtml(m.format)}</span></span><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${checkChip}${seenChip}${removedChip}${dupe}${barcode}</div><div class="formatBadge">${escapeHtml(m.format)}</div>${placeBtn}</div>
     </article>`;
   }
   const img = m.poster ? `<img src="${escapeHtml(m.poster)}" alt="Cover for ${escapeHtml(m.title)}" loading="lazy" onerror="this.remove()">` : '';
@@ -341,8 +367,9 @@ function getSectionFromForm(prefix){
   return section;
 }
 // Puts a new title at the top of the collection (not saved yet: callers save() once). f = {title,section,format,barcode,poster,notes,seen}; used by the Add form and by the phone-scanner queue (remote-scan.js).
+// Titles of new purchases are stored in UPPERCASE like the rest of the collection and the blueprint (Edit keeps whatever is typed).
 function newMovie(f){
-  const movie={id:cryptoId(), title:f.title, section:f.section, format:f.format, barcode:f.barcode||'', poster:f.poster||'', posterRemoved:false, notes:f.notes||'', seen:!!f.seen, added:today(), updated:today()};
+  const movie={id:cryptoId(), title:String(f.title||'').toUpperCase(), section:f.section, format:f.format, barcode:f.barcode||'', poster:f.poster||'', posterRemoved:false, notes:f.notes||'', seen:!!f.seen, added:today(), updated:today()};
   if(movie.poster) movie.posterSource='manual';
   if(!state.sectionOrder.includes(movie.section)) state.sectionOrder.push(movie.section);
   state.movies.unshift(movie);
@@ -351,10 +378,11 @@ function newMovie(f){
 function addMovie(){
   const title=els.newTitle.value.trim();
   if(!title){toast('Add a title first.'); els.newTitle.focus(); return;}
-  newMovie({title, section:getSectionFromForm('new'), format:els.newFormat.value, barcode:els.newBarcode.value.trim(), poster:els.newPoster.value.trim(), notes:els.newNotes.value.trim(), seen:els.newSeen.checked});
+  const movie=newMovie({title, section:getSectionFromForm('new'), format:els.newFormat.value, barcode:els.newBarcode.value.trim(), poster:els.newPoster.value.trim(), notes:els.newNotes.value.trim(), seen:els.newSeen.checked});
+  vaultSet(LAST_FORMAT_KEY, movie.format);   // the Add form starts on the format used last
   save();
   ['newTitle','customSection','newBarcode','newPoster','newNotes'].forEach(id=>els[id].value=''); els.newSeen.checked=false; els.newSection.value=UNSORTED_SECTION;
-  updateTitleDupes(); populateSelects(); render(); renderQueue(); toast(`Added ${title}`);   // (the phone-scanner queue re-checks "already own")
+  updateTitleDupes(); populateSelects(); render(); renderQueue(); toast(`Added ${movie.title}`);   // (the phone-scanner queue re-checks "already own")
 }
 // Inline note under the Add title field: titles you already own that equal the typed one or start with it (barcode duplicates are scanner.js's job).
 function updateTitleDupes(){
@@ -472,8 +500,9 @@ function openShelfPicker(ids){
   const one=movies.length===1, counts=sectionCounts(), opt=(v,t)=>`<option value="${escapeHtml(v)}">${escapeHtml(t)}</option>`;
   els.shelfTitle.textContent = one ? 'Place on shelf' : 'Move to shelf';
   els.shelfWhat.textContent = one ? `${movies[0].title} · now in ${movies[0].section}` : `${movies.length.toLocaleString()} selected titles`;
-  const secs=[...new Set(state.sectionOrder)].filter(s=>s!==UNSORTED_SECTION);
-  if(movies.some(m=>m.section!==UNSORTED_SECTION)) secs.push(UNSORTED_SECTION);   // only offered when something could go back there
+  // Targets are real shelves: shelves that are still waiting to be sorted are not offered, and neither is the shelf all chosen titles are already on.
+  const secs=allShelves().filter(s=>!isToBeSorted(s) && !movies.every(m=>m.section===s));
+  if(movies.some(m=>!isToBeSorted(m.section))) secs.push(UNSORTED_SECTION);   // only offered when something could go back to the to-sort pile
   els.shelfSelect.innerHTML = '<option value="" disabled>Choose a shelf…</option>' + opt('__new__','New shelf…') + secs.map(s=>opt(s, `${s} (${counts[s]||0})`)).join('');
   els.shelfSelect.value = secs.includes(lastShelf) ? lastShelf : '';
   els.shelfNewInput.value='';
@@ -525,6 +554,141 @@ function undoMove(before, section){   // only titles still on that shelf are put
   state.movies.forEach(m=>{const b=prev.get(m.id); if(b && m.section===section){m.section=b[1]; m.updated=b[2]; n++;}});
   const ok=save(); render();
   if(ok) toast(`Moved ${n} title${n===1?'':'s'} back.`);
+}
+
+/* ---------- Shelf manager: rename / merge, reorder, "waiting to be sorted", delete ---------- */
+let renamingShelf = -1;   // index in sectionOrder of the shelf whose name is being edited, -1 = none
+function initShelves(){
+  ['shelvesBtn','shelvesModal','shelvesList','shelvesCloseBtn','blueprintShelf'].forEach(id=>els[id]=$(id));
+  els.shelvesBtn.addEventListener('click', openShelves);
+  els.shelvesCloseBtn.addEventListener('click', closeShelves);
+  els.shelvesModal.addEventListener('click',e=>{if(e.target===els.shelvesModal) closeShelves();});
+  els.shelvesList.addEventListener('click', onShelvesClick);
+  els.shelvesList.addEventListener('change', onShelvesChange);
+  els.shelvesList.addEventListener('keydown', onShelvesKey);
+  window.addEventListener('keydown',e=>{if(e.key==='Escape' && els.shelvesModal.classList.contains('active')) closeShelves();});   // (Escape inside the rename box only cancels the rename, see onShelvesKey)
+  els.blueprintShelf.addEventListener('change', updateBlueprintPreview);
+}
+function restoreLastFormat(){const f=vaultGet(LAST_FORMAT_KEY); if(f && KNOWN_FORMATS.includes(f)) els.newFormat.value=f;}
+function openShelves(){
+  renamingShelf=-1; renderShelves();
+  els.shelvesModal.classList.add('active');
+  setTimeout(()=>els.shelvesCloseBtn.focus({preventScroll:true}),30);
+}
+function closeShelves(){
+  if(!els.shelvesModal.classList.contains('active')) return;
+  els.shelvesModal.classList.remove('active'); renamingShelf=-1;
+  els.shelvesBtn.focus({preventScroll:true});
+}
+// focus = {i, sh}: the control to focus again after the list is rebuilt (if it is disabled now, the next best button in that row)
+function renderShelves(focus){
+  const counts=sectionCounts(), order=state.sectionOrder, last=order.length-1;
+  els.shelvesList.innerHTML=order.map((s,i)=>{
+    const n=counts[s]||0, esc=escapeHtml(s), fixed=s===UNSORTED_SECTION, sorting=isToBeSorted(s);
+    const name = renamingShelf===i
+      ? `<input class="shelfRenameInput" value="${esc}" aria-label="New name for ${esc}" autocomplete="off" spellcheck="false"><button type="button" class="miniBtn" data-sh="save">Save</button><button type="button" class="miniBtn" data-sh="cancel">Cancel</button>`
+      : `<span class="shelfLabel">${esc}</span><span class="shelfCount">${n.toLocaleString()} title${n===1?'':'s'}</span>`;
+    return `<div class="shelfRow${sorting?' sorting':''}" role="listitem" data-i="${i}" data-s="${esc}">
+      <div class="shelfNameCell">${name}</div>
+      <label class="checkLine shelfSortLbl"><input type="checkbox" data-sh="sort"${sorting?' checked':''}${fixed?' disabled title="New purchases land here, so this shelf always counts as waiting to be sorted"':''}> Waiting to be sorted</label>
+      <div class="shelfBtns">
+        <button type="button" class="miniBtn" data-sh="rename"${fixed?' disabled title="This shelf keeps its name"':''}>Rename</button>
+        <button type="button" class="miniBtn" data-sh="up" aria-label="Move ${esc} up"${i===0?' disabled':''}>▲</button>
+        <button type="button" class="miniBtn" data-sh="down" aria-label="Move ${esc} down"${i===last?' disabled':''}>▼</button>
+        <button type="button" class="miniBtn dangerBtn" data-sh="del" aria-label="Delete ${esc}"${n||fixed?` disabled title="${fixed?'This shelf cannot be deleted':'Only empty shelves can be deleted: move its titles first'}"`:''}>Delete</button>
+      </div>
+    </div>`;
+  }).join('');
+  if(renamingShelf>=0){const inp=els.shelvesList.querySelector('.shelfRenameInput'); if(inp){inp.focus(); inp.select();} return;}
+  if(focus){
+    const row=els.shelvesList.children[focus.i];
+    const pick=[focus.sh, focus.sh==='up'?'down':'up', 'rename'].map(sh=>row && row.querySelector(`[data-sh="${sh}"]:not(:disabled)`)).find(Boolean);
+    if(pick) pick.focus();
+  }
+}
+// The row a click / key belongs to; null (and a fresh list) if the shelves changed behind the dialog, e.g. in another tab.
+function shelfRowOf(el){
+  const row=el.closest('.shelfRow'); if(!row) return null;
+  const i=+row.dataset.i;
+  if(state.sectionOrder[i]!==row.dataset.s){renamingShelf=-1; renderShelves(); return null;}
+  return {i, name:row.dataset.s, row};
+}
+function onShelvesClick(e){
+  const b=e.target.closest('button[data-sh]'); if(!b || b.disabled) return;
+  const r=shelfRowOf(b); if(!r) return;
+  const act=b.dataset.sh;
+  if(act==='rename'){renamingShelf=r.i; renderShelves();}
+  else if(act==='cancel'){renamingShelf=-1; renderShelves({i:r.i, sh:'rename'});}
+  else if(act==='save') renameShelf(r.i, r.row.querySelector('.shelfRenameInput').value);
+  else if(act==='up' || act==='down') moveShelf(r.i, act==='up' ? -1 : 1);
+  else if(act==='del') deleteShelf(r.i);
+}
+function onShelvesChange(e){
+  const box=e.target.closest('input[data-sh="sort"]'); if(!box) return;
+  const r=shelfRowOf(box); if(r) setShelfToSort(r.i, box.checked);
+}
+function onShelvesKey(e){
+  const inp=e.target.closest('.shelfRenameInput'); if(!inp) return;
+  const r=shelfRowOf(inp); if(!r) return;
+  if(e.key==='Enter'){e.preventDefault(); renameShelf(r.i, inp.value);}
+  else if(e.key==='Escape'){e.preventDefault(); e.stopPropagation(); renamingShelf=-1; renderShelves({i:r.i, sh:'rename'});}
+}
+// Remembers what a rename / merge / delete of shelf `old` changes (`to` = the new name or the shelf merged into), so its Undo toast can put it back.
+function shelfSnap(old, to, renamed){return {old, to, renamed, index:state.sectionOrder.indexOf(old), sorted:state.toSortShelves.includes(old), filter:els.sectionFilter.value, moved:[]};}
+function shelvesChanged(focus){   // every change: save, refresh the selects, re-render the list of titles and the dialog. false if the save failed (save() already warned)
+  const ok=save(); populateSelects(); render(); renderShelves(focus);
+  return ok;
+}
+function undoShelfOp(snap){
+  const byId=new Map(snap.moved.map(b=>[b[0],b]));
+  state.movies.forEach(m=>{const b=byId.get(m.id); if(b && m.section===snap.to){m.section=b[1]; m.updated=b[2];}});   // only titles still on that shelf go back
+  if(snap.renamed && !state.movies.some(m=>m.section===snap.to)){   // the new name is not used by anything now
+    state.sectionOrder=state.sectionOrder.filter(x=>x!==snap.to); state.toSortShelves=state.toSortShelves.filter(x=>x!==snap.to);
+  }
+  if(!state.sectionOrder.includes(snap.old)) state.sectionOrder.splice(Math.min(snap.index, state.sectionOrder.length), 0, snap.old);
+  state.toSortShelves=state.toSortShelves.filter(x=>x!==snap.old); if(snap.sorted) state.toSortShelves.push(snap.old);
+  if(snap.to && snap.filter===snap.old && els.sectionFilter.value===snap.to) setSectionFilter(snap.old);
+  renamingShelf=-1;
+  if(shelvesChanged()) toast('Undone.');
+}
+function renameShelf(i, raw){
+  const old=state.sectionOrder[i], name=String(raw||'').trim().toUpperCase();
+  if(old===undefined || old===UNSORTED_SECTION) return;
+  if(!name){toast('A shelf needs a name.'); return;}
+  if(name===old){renamingShelf=-1; renderShelves({i, sh:'rename'}); return;}
+  const n=sectionCounts()[old]||0, merge=state.sectionOrder.includes(name);
+  if(merge && !confirm(`Merge ${n} title${n===1?'':'s'} into ${name}?\n\n“${old}” will no longer exist as a shelf.`)) return;
+  const snap=shelfSnap(old, name, !merge), t=today(), ns=els.newSection.value;
+  state.movies.forEach(m=>{if(m.section===old){snap.moved.push([m.id, old, m.updated]); m.section=name; m.updated=t;}});
+  if(merge) state.sectionOrder.splice(i,1); else state.sectionOrder[i]=name;   // a merge keeps the position of the shelf that stays
+  state.toSortShelves = merge ? state.toSortShelves.filter(x=>x!==old) : state.toSortShelves.map(x=>x===old ? name : x);
+  if(els.sectionFilter.value===old) setSectionFilter(name);
+  if(lastShelf===old) lastShelf=name;
+  renamingShelf=-1;
+  const ok=shelvesChanged({i: merge ? Math.min(i, state.sectionOrder.length-1) : i, sh:'rename'});
+  if(ns===old) els.newSection.value=name;
+  if(ok) toast(merge ? `Merged ${n} title${n===1?'':'s'} into ${name}.` : `Renamed “${old}” to “${name}”.`, 8000, {warn:false, action:{label:'Undo', fn:()=>undoShelfOp(snap)}});
+}
+function moveShelf(i, d){
+  const order=state.sectionOrder, j=i+d; if(j<0 || j>=order.length) return;
+  [order[i], order[j]]=[order[j], order[i]];
+  shelvesChanged({i:j, sh:d<0 ? 'up' : 'down'});
+}
+function setShelfToSort(i, on){
+  const s=state.sectionOrder[i]; if(s===undefined || s===UNSORTED_SECTION) return;
+  state.toSortShelves = on ? [...new Set([...state.toSortShelves, s])] : state.toSortShelves.filter(x=>x!==s);
+  shelvesChanged({i, sh:'sort'});
+}
+function deleteShelf(i){
+  const s=state.sectionOrder[i]; if(s===undefined || s===UNSORTED_SECTION) return;
+  if(sectionCounts()[s]){toast('Only empty shelves can be deleted. Move its titles to another shelf first.'); return;}
+  if(!confirm(`Delete the empty shelf “${s}”?`)) return;
+  const snap=shelfSnap(s, null, false);
+  state.sectionOrder.splice(i,1); state.toSortShelves=state.toSortShelves.filter(x=>x!==s);
+  if(els.sectionFilter.value===s) setSectionFilter('all');
+  if(lastShelf===s) lastShelf='';
+  const ok=shelvesChanged({i: Math.min(i, state.sectionOrder.length-1), sh:'rename'});
+  if(ok) toast(`Deleted shelf “${s}”.`, 8000, {warn:false, action:{label:'Undo', fn:()=>undoShelfOp(snap)}});
 }
 
 function formatMoney(value){

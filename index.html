@@ -59,17 +59,17 @@
     <section class="stats" aria-label="Collection stats">
       <div class="stat" id="totalStat"><small id="totalLabel">Total titles</small><strong id="totalCount">0</strong></div>
       <div class="stat clickable" id="duplicatesStat" role="button" tabindex="0" aria-pressed="false" title="Click to show only titles you own multiple copies of"><small>Duplicates</small><strong id="duplicateCount">0</strong><span class="micro" id="duplicateMicro">Click to filter</span></div>
-      <div class="stat clickable" id="smartFilterStat" role="button" tabindex="0" aria-pressed="false" title="Click to filter unsorted titles, or unseen titles when there are no unsorted titles"><small id="smartFilterLabel">Unsorted</small><strong id="fourKCount">0</strong><span class="micro" id="smartFilterMicro">Click to filter</span></div>
+      <div class="stat clickable" id="smartFilterStat" role="button" tabindex="0" aria-pressed="false" title="Click to filter the titles that are waiting to be sorted onto a shelf, or unseen titles when nothing is waiting"><small id="smartFilterLabel">To sort</small><strong id="fourKCount">0</strong><span class="micro" id="smartFilterMicro">Click to filter</span></div>
       <div class="stat clickable" id="collectionValueStat" title="Double click to edit collection value"><small>Total collection value</small><strong id="collectionValue">0 kr</strong><span class="micro">Double-click to edit</span></div>
     </section>
 
     <section class="controls" aria-label="Filters and sorting">
       <div class="field"><label for="searchInput">Search title, barcode or notes</label><input id="searchInput" type="search" placeholder="Search collection…"></div>
-      <div class="field"><label for="sectionFilter">Section</label><select id="sectionFilter"></select></div>
+      <div class="field"><div class="labelRow"><label for="sectionFilter">Section</label><button type="button" class="linkBtn" id="shelvesBtn" title="Rename, merge, reorder or remove shelves">Shelves</button></div><select id="sectionFilter"></select></div>
       <div class="field"><label for="formatFilter">Format</label><select id="formatFilter"></select></div>
       <div class="field"><label for="seenFilter">Seen</label><select id="seenFilter"><option value="all">Seen + unseen</option><option value="unseen">Not seen yet</option><option value="seen">Seen</option></select></div>
-      <div class="field"><label for="sortSelect">Sort</label><select id="sortSelect"><option value="title-asc">Title A–Z</option><option value="title-desc">Title Z–A</option><option value="added-desc">Newest added</option><option value="unseen-first">Unseen first</option><option value="dupes-first">Duplicates first</option><option value="auto-first">Covers to review first</option></select></div>
-      <div class="toggleRow"><button class="ghost" id="unsortedBtn">Unsorted</button></div>
+      <div class="field"><label for="sortSelect">Sort</label><select id="sortSelect"><option value="title-asc">Title A–Z</option><option value="title-desc">Title Z–A</option><option value="added-desc">Newest added</option><option value="unseen-first">Unseen first</option><option value="dupes-first">Duplicates first</option><option value="auto-first">Covers to review first</option><option value="shelf">By shelf</option></select></div>
+      <div class="toggleRow"><button class="ghost" id="unsortedBtn" title="Show every title that is still waiting for a shelf">To sort</button></div>
       <div class="toggleRow"><button class="ghost" id="viewToggle">List view</button><button class="ghost" id="selectToggle" aria-pressed="false" title="Tick several titles, then move them to a shelf or mark them seen">Select</button></div>
     </section>
 
@@ -162,6 +162,7 @@
     <section class="panel">
       <h2>Blueprint-style export</h2>
       <p>This export groups your saved movies by section and keeps the old collection-list feel: title header, section names and star bullets. Exported HTML can be opened in Word or printed to PDF.</p>
+      <div class="field bpShelf"><label for="blueprintShelf">Shelf</label><select id="blueprintShelf"><option value="">All shelves</option></select></div>
       <div class="actions" style="justify-content:flex-start;margin-bottom:14px">
         <button class="primary" id="downloadBlueprintBtn">Download blueprint HTML</button>
         <button class="ghost" id="downloadBlueprintTextBtn">Download blueprint TXT</button>
@@ -235,6 +236,14 @@
       <button class="danger" id="importReplaceBtn">Replace all</button>
       <button class="primary" id="importMergeBtn">Merge</button>
     </div>
+  </div>
+</div>
+
+<div class="modal" id="shelvesModal" role="dialog" aria-modal="true" aria-labelledby="shelvesTitle">
+  <div class="modalCard shelvesCard">
+    <div class="modalHead"><h2 id="shelvesTitle">Shelves</h2><button class="ghost" id="shelvesCloseBtn">Close</button></div>
+    <p class="shelvesHint">Rename a shelf, change the order (it also sets the order of the Section filter, the blueprint export and the “By shelf” list), mark shelves whose titles still have to be sorted, or delete empty ones. Renaming a shelf to a name that already exists merges them.</p>
+    <div class="shelvesList" id="shelvesList" role="list"></div>
   </div>
 </div>
 

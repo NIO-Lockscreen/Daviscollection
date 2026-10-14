@@ -8,6 +8,7 @@ const LAST_CHANGE_KEY = 'movieVault.lastChangeAt';
 const PRE_MIGRATION_KEY = 'movieVault.preMigrationBackup'; // raw copy of a pre-v2 save, kept before it is migrated
 const UNREADABLE_KEY = 'movieVault.unreadableSave';        // raw copy of a save that could not be parsed
 const BACKUP_REMINDER_DAYS = 7;
+const TO_SORT_DEFAULT_RE = /TEMPORARY|NEED TO BE ARRANGED|NOT PLACED/i; // shelves that count as "still waiting to be sorted" when a save has no toSortShelves list yet
 let loadNotice = '', storagePersisted = null, shareSupported = false, hasSnapshot = false, pendingImport = null, lastSaveWarnAt = 0, lastSyncAt = 0, syncTimer = 0;
 
 function vaultGet(key){try{return localStorage.getItem(key)}catch(e){return null}}
@@ -41,7 +42,7 @@ function loadState(){
       if(!isCurrentSchema(saved)){ // older save: the legacy repairs just ran once, store the result as v2 so they never run again
         if(vaultGet(PRE_MIGRATION_KEY)===null) vaultSet(PRE_MIGRATION_KEY, raw);
         if(writeState(s) && vaultGet(LAST_CHANGE_KEY)===null) vaultSet(LAST_CHANGE_KEY, new Date().toISOString()); // data that was never exported counts as unbacked-up
-      }
+      }else if(!Array.isArray(saved.toSortShelves)) writeState(s); // first load after toSortShelves was added: store the default list once (not a user change, so LAST_CHANGE stays)
       return s;
     }
   }catch(e){}
@@ -93,7 +94,11 @@ function normalizeState(input){
   const list=(Array.isArray(input.movies) ? input.movies : []).filter(m=>m && typeof m==='object');
   const movies = current ? list.map(currentMovie) : list.map(legacyMovie).filter(m=>!isBadImportedTitle(m.title));
   movies.forEach(m=>{if(!sectionOrder.includes(m.section)) sectionOrder.push(m.section)});
-  return {schemaVersion:SCHEMA_VERSION, movies, sectionOrder, importedFrom:input.importedFrom || 'local', importedCount:input.importedCount || movies.length, collectionValue:Number(input.collectionValue || 0), valueHistory:Array.isArray(input.valueHistory)?input.valueHistory:[]};
+  // Shelves still waiting to be sorted (UNSORTED / NOT PLACED always counts and is not stored). A missing list is filled from the shelf names once.
+  const toSortShelves = Array.isArray(input.toSortShelves)
+    ? [...new Set(input.toSortShelves.map(s=>current ? txt(s) : String(s).trim().toUpperCase()).filter(s=>s.trim() && s!==UNSORTED_SECTION && sectionOrder.includes(s)))]
+    : sectionOrder.filter(s=>s!==UNSORTED_SECTION && TO_SORT_DEFAULT_RE.test(s));
+  return {schemaVersion:SCHEMA_VERSION, movies, sectionOrder, toSortShelves, importedFrom:input.importedFrom || 'local', importedCount:input.importedCount || movies.length, collectionValue:Number(input.collectionValue || 0), valueHistory:Array.isArray(input.valueHistory)?input.valueHistory:[]};
 }
 function save(){
   if(!writeState(state)){warnSaveFailed(); return false;}
@@ -207,10 +212,10 @@ function beginImport(text){
   if(parsed.error){toast(parsed.error, 4500); return;}
   let incoming; try{incoming=normalizeState(parsed.data)}catch(err){toast('Could not read that backup file.', 4500); return;}
   if(!incoming.movies.length){toast('That backup has no usable movies in it.', 4500); return;}
-  pendingImport={incoming, exportedAt:parsed.data.exportedAt};
+  pendingImport={incoming, exportedAt:parsed.data.exportedAt, listed:Array.isArray(parsed.data.toSortShelves)};
   showImportDialog();
 }
-function mergeStates(cur, inc){
+function mergeStates(cur, inc, incListed=true){ // incListed: the file had its own toSortShelves (an older backup only has the name-based default, which must not re-flag shelves you already know)
   const movies=cur.movies.slice(), at=new Map(), addedIds=new Set(); let added=0, updated=0;
   movies.forEach((m,i)=>at.set(m.id,i));
   inc.movies.forEach(m=>{
@@ -220,7 +225,8 @@ function mergeStates(cur, inc){
   });
   const hasValue=s=>!!s.collectionValue || (s.valueHistory||[]).length>0;
   const useFileValue=!hasValue(cur) && hasValue(inc);
-  const state=normalizeState({schemaVersion:SCHEMA_VERSION, movies, sectionOrder:[...cur.sectionOrder, ...inc.sectionOrder], importedFrom:cur.importedFrom, importedCount:movies.length,
+  const toSortShelves=[...cur.toSortShelves, ...inc.toSortShelves.filter(s=>incListed || !cur.sectionOrder.includes(s))];
+  const state=normalizeState({schemaVersion:SCHEMA_VERSION, movies, sectionOrder:[...cur.sectionOrder, ...inc.sectionOrder], toSortShelves, importedFrom:cur.importedFrom, importedCount:movies.length,
     collectionValue:useFileValue ? inc.collectionValue : cur.collectionValue, valueHistory:useFileValue ? inc.valueHistory : cur.valueHistory});
   state.sectionOrder=[...new Set(state.sectionOrder)];
   return {state, added, updated};
@@ -229,7 +235,7 @@ function showImportDialog(){
   const p=pendingImport, modal=$('importModal'); if(!p || !modal) return;
   const when=p.exportedAt && !isNaN(Date.parse(p.exportedAt)) ? 'exported '+new Date(p.exportedAt).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) : 'export date unknown';
   $('importSummary').textContent=`This file: ${p.incoming.movies.length} movies, ${when} · Your current collection: ${state.movies.length} movies`;
-  const m=mergeStates(state,p.incoming);
+  const m=mergeStates(state,p.incoming,p.listed);
   $('importMergeInfo').textContent=`adds the movies you don't have yet and keeps the newer version of movies in both (${m.added} to add, ${m.updated} to update). Your current movies stay.`;
   $('importReplaceInfo').textContent=`swaps your whole collection for the ${p.incoming.movies.length} movies in this file.`;
   modal.classList.add('active');
@@ -246,7 +252,7 @@ function takeSnapshot(){
 }
 function applyImport(mode){
   const p=pendingImport; if(!p) return;
-  const merged=mode==='merge' ? mergeStates(state,p.incoming) : null;
+  const merged=mode==='merge' ? mergeStates(state,p.incoming,p.listed) : null;
   if(!takeSnapshot()){cancelImport(); return;}
   state=merged ? merged.state : p.incoming;
   closeImportModal();
@@ -352,11 +358,18 @@ function groupedMovies(){
   order.forEach(s=>groups[s].sort((a,b)=>a.title.localeCompare(b.title)));
   return {order, groups};
 }
-function blueprintText(){
+// The Shelf selector on the Blueprint export screen: '' = all shelves, otherwise one shelf name.
+function blueprintScope(){return (typeof els!=='undefined' && els.blueprintShelf && els.blueprintShelf.value) || '';}
+function blueprintFileName(ext){
+  const shelf=blueprintScope(), slug=shelf.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-+|-+$/g,'');
+  return 'digital-video-disc-collection-blueprint'+(shelf ? '-'+(slug||'shelf') : '')+'.'+ext;
+}
+function blueprintText(shelf=blueprintScope()){
   const {order,groups}=groupedMovies();
   const year=new Date().getFullYear();
   let out='THE DIGITAL VIDEO DISC COLLECTION\n\nTHE DIGITAL VIDEO DISC COLLECTION\nFOR\nHARRY A.DAVIS.\n(1998-'+year+')\n\n\n';
   for(const sec of order){
+    if(shelf && sec!==shelf) continue;
     const list=groups[sec]; if(!list?.length) continue;
     out += sec + ':\t\t';
     list.forEach((m,i)=>{
@@ -372,19 +385,33 @@ function blueprintText(){
   }
   return out;
 }
-function blueprintHtml(){
-  const text=blueprintText();
+function blueprintHtml(shelf=blueprintScope()){
+  const text=blueprintText(shelf);
   return `<!doctype html><html><head><meta charset="utf-8"><title>Digital Video Disc Collection Export</title><style>
   @page{margin:22mm 18mm} body{font-family:"Courier New",monospace;color:#111;background:white;font-size:12pt;line-height:1.25} .page{max-width:820px;margin:0 auto} pre{white-space:pre-wrap;margin:0} h1{font-family:Arial,sans-serif;text-align:center;font-size:18pt;margin:0 0 16pt} .meta{text-align:center;font-family:Arial,sans-serif;margin-bottom:22pt} @media print{body{font-size:11pt}.noPrint{display:none}}
   </style></head><body><div class="page"><pre>${escapeHtml(text)}</pre></div></body></html>`;
 }
+// Options of the Shelf selector: "All shelves" plus every shelf that holds titles (with counts). Rebuilt only when that list changed; a shelf that is gone falls back to all.
+let blueprintShelfSig = '';
+function updateBlueprintShelves(){
+  const sel=els.blueprintShelf; if(!sel) return;
+  const counts=sectionCounts(), secs=allShelves().filter(s=>counts[s]);
+  const sig=secs.map(s=>s+'\t'+counts[s]).join('\n');
+  if(sig!==blueprintShelfSig){
+    blueprintShelfSig=sig;
+    const cur=sel.value;
+    sel.innerHTML='<option value="">All shelves</option>'+secs.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)} (${counts[s]})</option>`).join('');
+    sel.value=secs.includes(cur) ? cur : '';
+  }
+}
 function updateBlueprintPreview(){
   if(!els.blueprintPreview) return;
+  updateBlueprintShelves();
   const text=blueprintText();
   els.blueprintPreview.textContent=text.slice(0,12000) + (text.length>12000?'\n\n… Preview truncated, export contains the full list.':'');
 }
-function exportBlueprintHtml(){downloadBlob(blueprintHtml(),'digital-video-disc-collection-blueprint.html','text/html'); toast('Blueprint HTML exported.');}
-function exportBlueprintText(){downloadBlob(blueprintText(),'digital-video-disc-collection-blueprint.txt','text/plain'); toast('Blueprint TXT exported.');}
+function exportBlueprintHtml(){downloadBlob(blueprintHtml(),blueprintFileName('html'),'text/html'); toast('Blueprint HTML exported.');}
+function exportBlueprintText(){downloadBlob(blueprintText(),blueprintFileName('txt'),'text/plain'); toast('Blueprint TXT exported.');}
 function printBlueprint(){
   const w=window.open('','_blank'); if(!w){toast('Popup blocked. Use download instead.'); return;}
   w.document.write(blueprintHtml()); w.document.close(); w.focus(); setTimeout(()=>w.print(),350);
