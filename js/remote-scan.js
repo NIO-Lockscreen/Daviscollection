@@ -545,7 +545,7 @@ function rsRender(){
   const showQr=rsActive && rsReady && !!$('rsQr').dataset.url;
   $('rsQr').hidden=!showQr; $('rsUrlField').hidden=!(rsActive && rsReady);
   $('rsNewCodeBtn').textContent = rsActive ? 'New code' : 'Try again';
-  const pill=$('rsPill'); pill.hidden=!rsActive;
+  const pill=$('rsPill'); pill.hidden=!rsActive || activeScreen==='add';   // on Add / scan the panel itself shows the status, and the pill would cover the form's buttons
   $('rsPillText').textContent = rsLimited ? '📱 '+RS_PC_LIMIT_TEXT : rsState==='connected' ? '📱 Phone scanner connected' : rsState==='disconnected' ? '📱 Phone scanner: phone disconnected' : rsState==='waiting' ? '📱 Phone scanner: waiting for phone' : '📱 Phone scanner: connecting…';
   pill.dataset.state=rsLimited ? 'disconnected' : rsState;
   rsRenderCount();

@@ -119,6 +119,7 @@ function showScreen(screen){
   document.querySelectorAll('.tab').forEach(btn=>btn.setAttribute('aria-selected', btn.dataset.screen===screen ? 'true':'false'));
   if(screen==='export') updateBlueprintPreview();
   if(screen==='add'){updateTitleDupes(); onAddScreenShown();}   // (remote-scan.js: the computer starts its phone-pairing session here)
+  if(typeof rsRender==='function') rsRender();   // the phone-scanner pill is hidden on Add / scan and shown elsewhere
   if(screen!=='library' && selectMode) setSelectMode(false);
   if(screen==='library') requestAnimationFrame(setupVisibleCoverAutoload);
 }
