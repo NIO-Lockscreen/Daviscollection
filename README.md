@@ -14,7 +14,7 @@ Selve appen er på engelsk. Denne README-en er på norsk.
 - **Rask visning.** Kortene tegnes etter hvert som du blar, så samlingen åpner på et blunk også på mobil. Seksjonsfilteret viser antall titler per hylle, og «Clear filters» nullstiller søk og filtre.
 - **Sett / ikke sett.** Hver tittel kan merkes som sett. Filteret «Seen» og sorteringen «Unseen first» gjør det enkelt å finne noe du ikke har sett ennå.
 - **Strekkodeskanning på mobil.** Fanen «Add / scan» bruker kameraet til å lese strekkoden på plata, og kan slå opp et tittelforslag. Kameraet krever https eller localhost, så det virker på den publiserte siden, men ikke hvis du åpner `index.html` direkte fra disk. Ved feilsøk får du en lenke for å google strekkoden.
-- **Mobilen som skanner for PC-en.** På «Add / scan» på PC-en trykker du **Use phone as scanner**, skanner QR-koden med mobilens vanlige kamera-app, og strekkodene du skanner på mobilen dukker opp live på PC-en. Se avsnittet «Mobilen som skanner for PC-en» under.
+- **Mobilen som skanner for PC-en.** På «Add / scan» på PC-en står det en QR-kode klar under **Scan with your phone**; du skanner den med mobilens vanlige kamera-app, og strekkodene du skanner på mobilen dukker opp live på PC-en. Se avsnittet «Mobilen som skanner for PC-en» under.
 - **Har jeg den allerede?** Når du skanner en strekkode eller skriver en tittel som allerede finnes i samlingen, sier appen fra med en gang («You already own this…» / «You already have…»). Det er nyttig i butikken.
 - **Angre.** Etter at du har slettet en film eller flyttet titler til en hylle, kan du angre i noen sekunder.
 - **Automatiske covers.** Se avsnittet «Coverbilder» under.
@@ -25,25 +25,41 @@ Selve appen er på engelsk. Denne README-en er på norsk.
 
 Praktisk når du sitter ved PC-en med en stabel plater: telefonen er skanneren, og PC-en viser tittel, advarsel om duplikat og knapper for å legge filmen til.
 
-1. Åpne appen på PC-en (`https://daviscollection.vercel.app`), gå til **Add / scan** og trykk **Use phone as scanner**. Det kommer opp en QR-kode.
+1. Åpne appen på PC-en (`https://daviscollection.vercel.app`) og gå til **Add / scan**. Panelet **Scan with your phone** viser en QR-kode med en gang, uten at du trykker på noe (PC-en regnes som PC når hovedpekeren er mus/styreflate; telefoner og nettbrett viser kameraet i stedet). Under QR-koden står status («Waiting for phone» / «Phone connected ✓»), adressen i liten skrift hvis du vil skrive den inn på telefonen, og en liten knapp **New code** som avslutter økten og lager en ny kode. Å vise koden koster ingen meldinger: ingenting sendes før en telefon kobler til.
 2. Skann QR-koden med mobilens vanlige kamera-app og åpne lenken. Appen åpnes på telefonen i **Remote scanner**-modus, koblet til PC-en. Ingen konto eller innlogging trengs, og samlingen trenger ikke ligge på telefonen.
-3. Trykk **Start scan** på telefonen og hold strekkoden foran kameraet. Kameraet fortsetter å skanne etter hvert treff (samme kode sendes ikke på nytt før den har vært ute av bildet i ca. 2,5 sekunder), og telefonen vibrerer for hver kode som sendes. Under kameraet ser du hva PC-en svarte: tittelen, eller «Already in collection: …».
+3. Trykk **Start scan** på telefonen (samme knapp blir til **Stop** mens kameraet går) og hold strekkoden foran kameraet. Kameraet fortsetter å skanne etter hvert treff (samme kode sendes ikke på nytt før den har vært ute av bildet i ca. 2,5 sekunder), og telefonen vibrerer for hver kode som sendes. Under kameraet ser du hva PC-en svarte: tittelen, eller «Already in collection: …».
 4. På PC-en kommer hver kode i panelet **Scanned on phone** (øverst på Add / scan) med strekkode, tittelforslag og, hvis du har den fra før, «You already own: TITTEL (HYLLE)». Per kode kan du velge **Add to Unsorted** (legger filmen på hylla UNSORTED / NOT PLACED med tittel og strekkode), **Edit first** (fyller ut skjemaet «Add a movie», så du kan rette tittel eller format før du legger til) eller **Dismiss**. **Add all to Unsorted** legger til alle som har tittel og som du ikke eier fra før. Etter å ha lagt til kan du angre i noen sekunder (Undo). Samme kode to ganger gir ikke to rader, den eksisterende raden blinker.
-5. Du kan lukke QR-vinduet. Økten fortsetter så lenge pillen **«📱 Phone scanner connected · Stop»** vises nederst til venstre. Trykk **Stop** når du er ferdig. Bare én telefon er koblet til om gangen.
+5. Økten fortsetter selv om du går til en annen fane i appen: pillen **«📱 Phone scanner connected · Stop»** nederst til venstre viser status, og et trykk på pillen tar deg tilbake til QR-koden. Trykk **Stop** i pillen (eller **New code**, eller lukk fanen) når du er ferdig; da får telefonen beskjed. Bare én telefon er koblet til om gangen.
 6. På telefonen tar **Use this phone normally** deg ut av Remote scanner og tilbake til vanlig app.
 
-Slik virker det: PC-en og telefonen kobles direkte til hverandre (WebRTC, via biblioteket PeerJS). Den gratis, offentlige signalserveren `0.peerjs.com` brukes bare til å få de to til å finne hverandre, og vi har ingen egen server. Det som sendes er kun strekkodetallene, kryptert mellom enhetene, og de lagres ikke noe sted. Strekkodeoppslaget (upcitemdb) og sjekken mot samlingen gjøres på PC-en. PeerJS og QR-biblioteket lastes først når du bruker funksjonen (fast versjon fra jsDelivr, med SRI-sjekk), så resten av appen er upåvirket.
+På en PC finnes det også en liten lenke nederst i panelet, **Use this computer's camera instead**, som bytter panelet til PC-ens eget kamera (én knapp som veksler mellom **Start scan** og **Stop**) og **Scan with your phone instead** for å gå tilbake. Valget huskes i nettleseren. På telefon og nettbrett vises alltid kameraet (ingen QR-kode der), også med én knapp for Start/Stop. Knappen **Lookup barcode** i skjemaet vises bare når strekkodefeltet har innhold.
 
-Sikkerhet: PC-ens tilfeldige id i QR-koden (ca. 80 bits) er den eneste tilgangskontrollen. Den som kjenner lenken, mens økten pågår, kan sende strekkoder til PC-vinduet. Ikke del bilde av QR-koden, og trykk **Stop** når du er ferdig. PC-en godtar bare riktig utformede strekkoder og ignorerer alt annet.
+Slik virker det: PC-en og telefonen snakker ikke direkte sammen. Alt går via det gratis, offentlige relayet **ntfy.sh** (det samme som lås-skjerm-appen for bilen bruker), med helt vanlig https. Derfor virker det på alle nett, og enhetene trenger **ikke** være på samme Wi-Fi. PC-en lytter på ett «tema» (`mv-<tilfeldig id>-s`) og telefonen på et annet (`mv-<tilfeldig id>-r`); telefonen publiserer hver strekkode til det første, og PC-en svarer på det andre. Vi har ingen egen server. Strekkodeoppslaget (upcitemdb) og sjekken mot samlingen gjøres på PC-en. QR-biblioteket lastes først når du bruker funksjonen (fast versjon fra jsDelivr, med SRI-sjekk), så resten av appen er upåvirket.
+
+Det sendes bare det som trengs, og ingenting mens ingen skanner (ingen «puls»): én melding når telefonen kobler til («hello») og ett svar fra PC-en («hi»), så **én melding per skannet kode og ett svar fra PC-en per kode**. Nederst i QR-vinduet står det hvor mange meldinger som er brukt i denne økten (til feilsøking).
+
+**Grense: ca. 250 meldinger per dag per nettverk.** ntfy.sh tillater rundt 250 meldinger om dagen fra samme IP-adresse (altså samme hjemmenett, telefon og PC på samme Wi-Fi deler grensa). Hver kode koster to meldinger (selve skanningen og svaret), pluss to for å koble til. Det blir ca. 120 plater om dagen, og det er nok for én stabel. Når grensa er nådd:
+
+- **Ingenting går tapt.** Telefonen viser en fast gul boks: «Daily limit reached. Scan the rest tomorrow …». Du kan fortsette å skanne; alle koder som ikke kom frem lagres på telefonen (i nettleseren, ikke på noen server), med en liten utvidbar liste og en **Clear saved**-knapp (spør før den sletter). Hver av dem står som «saved for tomorrow» i lista.
+- **Neste gang telefonen kobler til PC-en** (en ny QR-kode, eller **Try again**) sendes de lagrede kodene automatisk, eldste først («Sending N saved barcodes…»). En kode fjernes fra telefonen først når den er sendt. Går grensa i taket igjen underveis, blir resten liggende til neste gang.
+- Appen husker hvilken dato (lokal tid) grensa ble nådd, og slutter å prøve resten av dagen, så den ikke maser på ntfy.sh. Når en ny dag begynner prøver den vanlig igjen. En ny tilkobling gjør alltid ett ekte forsøk, så det går også tidligere hvis grensa har nullstilt seg (ntfy.sh nullstiller i sitt eget tempo, ikke nødvendigvis ved midnatt hos deg).
+- Hvis PC-en får «daily limit» når den skal svare, står det i QR-vinduet, i pillen og over køen: «Daily limit reached on this network. Barcodes already here still work; scan the rest tomorrow.». Det som allerede ligger i køen virker som vanlig.
+- En kortvarig «for mange forespørsler» (ikke dagsgrensa) venter appen ut i ca. 20 sekunder og prøver et par ganger til, aldri i en uendelig løkke. Du kan alltid skrive strekkoden rett inn på PC-en i stedet.
+
+**Personvern.** Strekkoder og titler går gjennom ntfy.sh sine offentlige servere under et tilfeldig hemmelig navn (22 tegn, ca. 130 bits), og ntfy.sh beholder meldingene i ca. 12 timer. Det er greit for strekkoder, men ikke bruk funksjonen til noe privat. Samlingen din sendes aldri; bare strekkodene fra telefonen, og tittelen PC-en fant (eller «You already own …»), går via relayet.
+
+Sikkerhet: det tilfeldige navnet i QR-koden er den eneste tilgangskontrollen. Den som kjenner lenken, mens økten pågår, kan sende strekkoder til PC-vinduet (og lese det som sendes). Ikke del bilde av QR-koden, og trykk **Stop** når du er ferdig; da får telefonen beskjed («The computer ended the session.»). PC-en godtar bare riktig utformede strekkoder og ignorerer alt annet, og all tekst vises som ren tekst.
 
 Feilsøking:
 
-- **Begge enhetene trenger internett.** De trenger ikke være på samme Wi-Fi. Står det at telefonen eller PC-en ikke får lastet bibliotek eller nå «pairing server», er det nettet som mangler eller blokkerer `cdn.jsdelivr.net` / `0.peerjs.com`.
-- **Hold PC-vinduet åpent.** Lukker du fanen eller lar PC-en gå i dvale, står det «PC not found — is the PC window still open?» på telefonen. Åpne vinduet igjen og trykk **Try again** (ny QR-kode hvis du måtte starte økten på nytt).
-- **Noen nettverk blokkerer direkte forbindelse mellom enheter** (bedrifts- og gjestenett, noen mobilnett). Prøv mobildata på telefonen eller et annet Wi-Fi.
-- Slår telefonskjermen seg av, stopper kameraet. Appen prøver å holde skjermen våken, og kobler seg til PC-en igjen av seg selv når den kommer tilbake (opptil fem forsøk, deretter **Try again**).
+- **Begge enhetene trenger internett.** De trenger ikke være på samme Wi-Fi. Står det «Could not reach the relay (ntfy.sh)», er det nettet som mangler eller blokkerer `ntfy.sh` / `cdn.jsdelivr.net` (QR-biblioteket).
+- **«Daily relay limit reached (ntfy.sh)»**: dagsgrensa er brukt opp, se over. Kodene er lagret på telefonen og sendes neste gang.
+- **«PC not found — is the PC window still open?»** på telefonen: PC-vinduet må være åpent (QR-vinduet eller pillen **📱 Phone scanner … · Stop** nederst til venstre). Lukker du fanen eller laster siden på nytt, ender økten (telefonen får «The computer ended the session.») og du må vise en ny QR-kode. Åpne vinduet igjen og trykk **Try again** hvis økten fortsatt går.
+- **Status «Phone connected ✓» på PC-en betyr at telefonen har sagt hei.** Siden det ikke sendes noen puls, vet ikke PC-en om telefonen senere går i dvale; trykker du **Use this phone normally** får PC-en beskjed.
+- Slår telefonskjermen seg av, stopper kameraet. Appen prøver å holde skjermen våken, og kobler seg til relayet igjen av seg selv når siden kommer tilbake; ingenting går tapt mens telefonen var borte, siden den henter det den gikk glipp av.
+- Hvis den raske tilkoblingen (SSE) ikke virker på et nett (noen mellomtjenere bufrer den), faller appen tilbake til å hente nye meldinger hver 3.–5. sekund. Det virker, bare litt tregere.
 - Det gratis strekkodeoppslaget tillater ca. 100 oppslag om dagen, og det teller på PC-ens nett.
-- Testing: `window.MV_PEER_OPTIONS` (alle PeerJS-valg) eller `?peerhost=localhost:9000` peker appen mot en lokal `peerjs`-server (kun localhost/127.0.0.1) i stedet for den gratis skyen.
+- Testing: `?relay=http://localhost:PORT` (kun localhost/127.0.0.1) eller `window.MV_RELAY_BASE` peker appen mot en lokal ntfy-lignende test-server i stedet for ntfy.sh. Adressen står i konstanten `RELAY_BASE` øverst i `js/remote-scan.js`, så den kan pekes mot en egen ntfy-server senere.
 
 ## Publisering
 
@@ -94,7 +110,7 @@ Appen kan installeres, åpner da i eget vindu uten nettleser-menyer, og har eget
 - **Android (Chrome):** åpne siden → meny (⋮) → **Installer app** (Install app), eller **Legg til på startskjermen** (Add to home screen).
 - **PC (Chrome eller Edge):** trykk på installasjonsikonet ytterst i adressefeltet, eller velg menyen → **Installer Movie Vault**.
 
-Etter installasjon virker appens egne filer uten nett. Samlinga di ligger i nettleserens lagring og vises også uten nett. Coverbilder, oppslag av strekkoder, reserveskanneren og «mobilen som skanner» (lastes fra en CDN) trenger derimot nett. Coverbilder hentes fra internett og vises uten nett bare hvis nettleseren har dem i sin egen hurtigbuffer.
+Etter installasjon virker appens egne filer uten nett. Samlinga di ligger i nettleserens lagring og vises også uten nett. Coverbilder, oppslag av strekkoder, reserveskanneren og «mobilen som skanner» (QR-biblioteket lastes fra en CDN, og selve skanningen går via ntfy.sh) trenger derimot nett. Coverbilder hentes fra internett og vises uten nett bare hvis nettleseren har dem i sin egen hurtigbuffer.
 
 ## Coverbilder
 
@@ -146,7 +162,7 @@ js/seed-data.js        Startlista med titler (brukes bare første gang)
 js/storage.js          Lagring i localStorage, normalisering, JSON-backup, blueprint-eksport
 js/covers.js           Automatisk cover-oppslag og plakatvelgeren
 js/scanner.js          Strekkodeoppslag og kameraskanner
-js/remote-scan.js      Mobilen som skanner for PC-en (QR-kode, PeerJS, kø med skannede koder)
+js/remote-scan.js      Mobilen som skanner for PC-en (QR-kode, ntfy.sh-relay, kø med skannede koder)
 js/app.js              Tilstand, oppstart, visning av kort, redigering og verdi
 js/pwa.js              Registrerer service workeren (bare på http/https, ikke fra fil)
 icons/                 Appikonet (icon.svg og de ferdige PNG-filene)

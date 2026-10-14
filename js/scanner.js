@@ -59,6 +59,18 @@ function checkOwned(code,force=false){
   return o;
 }
 
+/* ---- small UI helpers ---- */
+// "Lookup barcode" is only useful when the barcode field has something in it (a scan looks the code up by itself).
+function syncLookupBtn(){if(els.barcodeLookupBtn) els.barcodeLookupBtn.hidden=!els.newBarcode.value.trim();}
+// One button for Start / Stop. Its label follows the camera box's "active" class, so it is right however the camera started or stopped
+// (button, error, page hidden, leaving the screen).
+function bindScanToggle(btn,box,start,stop){
+  const sync=()=>{const on=box.classList.contains('active'); btn.textContent=on ? 'Stop' : 'Start scan'; btn.classList.toggle('primary',!on); btn.classList.toggle('ghost',on);};
+  btn.addEventListener('click',()=>box.classList.contains('active') ? stop() : start());
+  new MutationObserver(sync).observe(box,{attributes:true,attributeFilter:['class']});
+  sync();
+}
+
 /* ---- status + Google fallback ---- */
 function setScanStatus(msg){
   scanMsg=msg||'';
@@ -111,6 +123,7 @@ async function lookupBarcode(code, fillForm=false){
   code=normalizeBarcode(code);
   if(!code){toast('Scan or type a barcode first.'); return;}
   if(els.newBarcode.value!==code) els.newBarcode.value=code;
+  syncLookupBtn();
   hideSearchFallback();
   const owned=checkOwned(code,true);
   const note=isRetailLength(code) && !retailCheckOk(code) ? 'Check digit does not match, so double-check the digits. ' : '';
@@ -312,7 +325,7 @@ function onQuaggaDetected(result){
 
 function onBarcodeFound(code){
   code=normalizeBarcode(code);
-  els.newBarcode.value=code;
+  els.newBarcode.value=code; syncLookupBtn();
   setScanStatus('Found barcode: '+code);
   stopScanner(false);
   lookupBarcode(code, true);
@@ -357,8 +370,10 @@ function initScanner(){
   window.addEventListener('pagehide',()=>stopIfRunning('Camera turned off.'));
   const add=$('add');
   if(add) new MutationObserver(()=>{if(!add.classList.contains('active')) stopIfRunning('Camera turned off because you left the Add screen.',true);}).observe(add,{attributes:true,attributeFilter:['class']});
+  bindScanToggle(els.scanToggleBtn,els.scanner,()=>startScanner(),()=>stopScanner());
   // duplicate warning while typing / pasting a barcode
-  els.newBarcode.addEventListener('input',()=>{hideSearchFallback(); checkOwned(els.newBarcode.value);});
+  els.newBarcode.addEventListener('input',()=>{syncLookupBtn(); hideSearchFallback(); checkOwned(els.newBarcode.value);});
+  syncLookupBtn();
   // addMovie() clears the field on success: drop the stale warning and fallback link
   els.addMovieBtn.addEventListener('click',()=>{
     if(els.newBarcode.value.trim()) return;

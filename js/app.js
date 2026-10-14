@@ -21,7 +21,7 @@ const selected = new Set();
 
 function $(id){return document.getElementById(id)}
 function init(){
-  ['totalCount','totalLabel','totalStat','duplicatesStat','duplicateCount','duplicateMicro','smartFilterStat','smartFilterLabel','smartFilterMicro','fourKCount','collectionValue','collectionValueStat','searchInput','sectionFilter','formatFilter','seenFilter','sortSelect','unsortedBtn','viewToggle','movieGrid','resultText','newTitle','newSection','customSection','newFormat','newBarcode','newSeen','newPoster','newNotes','addMovieBtn','posterLookupBtn','barcodeLookupBtn','scanner','scanVideo','scannerText','startScanBtn','stopScanBtn','scanStatus','backupMenuBtn','backupMenu','exportJsonBtn','importBtn','importFile','blueprintPreview','downloadBlueprintBtn','downloadBlueprintTextBtn','printBlueprintBtn','editModal','editPreview','closeModalBtn','editMovieTitle','editSection','editCustomSection','editFormat','editBarcode','editSeen','editPoster','editNotes','deleteMovieBtn','removePosterBtn','editPosterLookupBtn','saveEditBtn','valueModal','valueCloseBtn','valueCurrentText','valueMode','valueAmount','valueNote','valuePreviewText','valueWarning','valueConfirmLine','valueConfirm','rollbackValueBtn','applyValueBtn','valueHistoryList','toast','posterPickerModal','pickerTitle','pickerSubtitle','pickerSearchInput','pickerSearchBtn','pickerStatus','pickerGrid','pickerUrlInput','pickerUrlBtn','pickerCloseBtn','gridSentinel','clearFiltersBtn','selectToggle','selectBar','selectCount','selectAllBtn','selectMoveBtn','selectSeenBtn','selectUnseenBtn','selectCancelBtn','titleDupeNote','shelfModal','shelfTitle','shelfWhat','shelfSelect','shelfNewField','shelfNewInput','shelfOkBtn','shelfCancelBtn'].forEach(id=>els[id]=$(id));
+  ['totalCount','totalLabel','totalStat','duplicatesStat','duplicateCount','duplicateMicro','smartFilterStat','smartFilterLabel','smartFilterMicro','fourKCount','collectionValue','collectionValueStat','searchInput','sectionFilter','formatFilter','seenFilter','sortSelect','unsortedBtn','viewToggle','movieGrid','resultText','newTitle','newSection','customSection','newFormat','newBarcode','newSeen','newPoster','newNotes','addMovieBtn','posterLookupBtn','barcodeLookupBtn','scanner','scanVideo','scannerText','scanToggleBtn','scanStatus','backupMenuBtn','backupMenu','exportJsonBtn','importBtn','importFile','blueprintPreview','downloadBlueprintBtn','downloadBlueprintTextBtn','printBlueprintBtn','editModal','editPreview','closeModalBtn','editMovieTitle','editSection','editCustomSection','editFormat','editBarcode','editSeen','editPoster','editNotes','deleteMovieBtn','removePosterBtn','editPosterLookupBtn','saveEditBtn','valueModal','valueCloseBtn','valueCurrentText','valueMode','valueAmount','valueNote','valuePreviewText','valueWarning','valueConfirmLine','valueConfirm','rollbackValueBtn','applyValueBtn','valueHistoryList','toast','posterPickerModal','pickerTitle','pickerSubtitle','pickerSearchInput','pickerSearchBtn','pickerStatus','pickerGrid','pickerUrlInput','pickerUrlBtn','pickerCloseBtn','gridSentinel','clearFiltersBtn','selectToggle','selectBar','selectCount','selectAllBtn','selectMoveBtn','selectSeenBtn','selectUnseenBtn','selectCancelBtn','titleDupeNote','shelfModal','shelfTitle','shelfWhat','shelfSelect','shelfNewField','shelfNewInput','shelfOkBtn','shelfCancelBtn'].forEach(id=>els[id]=$(id));
   initCovers();
   document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>showScreen(btn.dataset.screen)));
   els.searchInput.addEventListener('input',()=>{clearTimeout(searchTimer); searchTimer=setTimeout(renderFresh,150);});   // debounced: no full re-render per keystroke
@@ -66,8 +66,6 @@ function init(){
   els.addMovieBtn.addEventListener('click', addMovie);
   els.posterLookupBtn.addEventListener('click',()=>lookupPosterForForm('new'));
   els.barcodeLookupBtn.addEventListener('click',()=>lookupBarcode(els.newBarcode.value.trim(), true));
-  els.startScanBtn.addEventListener('click',()=>startScanner());
-  els.stopScanBtn.addEventListener('click',stopScanner);
   initScanner();
   els.backupMenuBtn.addEventListener('click',()=>toggleBackupMenu());
   document.addEventListener('click',e=>{if(!e.target.closest('.backupWrap')) closeBackupMenu();});
@@ -120,7 +118,7 @@ function showScreen(screen){
   document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===screen));
   document.querySelectorAll('.tab').forEach(btn=>btn.setAttribute('aria-selected', btn.dataset.screen===screen ? 'true':'false'));
   if(screen==='export') updateBlueprintPreview();
-  if(screen==='add') updateTitleDupes();
+  if(screen==='add'){updateTitleDupes(); onAddScreenShown();}   // (remote-scan.js: the computer starts its phone-pairing session here)
   if(screen!=='library' && selectMode) setSelectMode(false);
   if(screen==='library') requestAnimationFrame(setupVisibleCoverAutoload);
 }
@@ -443,7 +441,7 @@ function addMovie(){
   const movie=newMovie({title, section:getSectionFromForm('new'), format:els.newFormat.value, barcode:els.newBarcode.value.trim(), poster:els.newPoster.value.trim(), notes:els.newNotes.value.trim(), seen:els.newSeen.checked});
   vaultSet(LAST_FORMAT_KEY, movie.format);   // the Add form starts on the format used last
   save();
-  ['newTitle','customSection','newBarcode','newPoster','newNotes'].forEach(id=>els[id].value=''); els.newSeen.checked=false; els.newSection.value=UNSORTED_SECTION;
+  ['newTitle','customSection','newBarcode','newPoster','newNotes'].forEach(id=>els[id].value=''); els.newSeen.checked=false; els.newSection.value=UNSORTED_SECTION; syncLookupBtn();
   updateTitleDupes(); populateSelects(); render(); renderQueue(); toast(`Added ${movie.title}`);   // (the phone-scanner queue re-checks "already own")
 }
 // Inline note under the Add title field: titles you already own that equal the typed one or start with it (barcode duplicates are scanner.js's job).

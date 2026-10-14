@@ -110,29 +110,45 @@
         </div>
         <div class="actions">
           <button class="ghost" id="posterLookupBtn">Find poster</button>
-          <button class="ghost" id="barcodeLookupBtn">Lookup barcode</button>
+          <button class="ghost" id="barcodeLookupBtn" hidden>Lookup barcode</button>
           <button class="primary" id="addMovieBtn">Add to collection</button>
         </div>
       </div>
 
-      <div class="panel">
-        <h2>Barcode scanner</h2>
-        <p>Best on phone in landscape/portrait with the back camera. Hold the barcode inside the frame. On a computer, use your phone as the scanner instead.</p>
-        <div id="scanner" class="scanner">
-          <video id="scanVideo" muted playsinline></video>
-          <div class="scanGuide"></div>
-          <div class="scannerText" id="scannerText">Camera is off.</div>
+      <div class="panel" id="scanPanel" data-mode="camera">
+        <h2 id="scanPanelTitle">Barcode scanner</h2>
+        <p id="scanPanelHint">Best in landscape or portrait with the back camera. Hold the barcode inside the frame.</p>
+        <div id="phonePane" hidden>
+          <div class="rsInline">
+            <div class="rsQr" id="rsQr" role="img" aria-label="QR code for pairing your phone" hidden></div>
+            <p class="rsHow" id="rsHow">Point your phone's camera at this code, open the link, then scan discs with the phone.</p>
+            <div class="rsStatus" id="rsStatus" role="status" aria-live="polite">Connecting…</div>
+            <p class="rsDetail" id="rsDetail" hidden></p>
+            <div class="field rsUrlLine" id="rsUrlField" hidden>
+              <label for="rsUrl">Or type this address in the phone's browser</label>
+              <input id="rsUrl" readonly spellcheck="false" autocomplete="off">
+            </div>
+            <button type="button" class="linkBtn" id="rsNewCodeBtn" title="End this session and make a new QR code">New code</button>
+            <p class="rsFine">Both devices need internet (they do not have to be on the same Wi-Fi). Barcodes and titles pass through the public relay ntfy.sh under a random secret name and are kept there for about 12 hours. Anyone with this QR code can send barcodes here, so use New code or Stop when you are done.</p>
+            <p class="rsCount" id="rsCount" title="Messages published or received in this session. ntfy.sh allows about 250 a day per network.">Relay messages this session: 0</p>
+          </div>
         </div>
-        <div class="actions">
-          <button class="ghost" id="phoneScanBtn" title="Show a QR code; scan it with your phone to send barcodes to this computer">Use phone as scanner</button>
-          <button class="primary" id="startScanBtn">Start scan</button>
-          <button class="ghost" id="stopScanBtn">Stop</button>
+        <div id="cameraPane">
+          <div id="scanner" class="scanner">
+            <video id="scanVideo" muted playsinline></video>
+            <div class="scanGuide"></div>
+            <div class="scannerText" id="scannerText">Camera is off.</div>
+          </div>
+          <div class="actions">
+            <button class="primary" id="scanToggleBtn">Start scan</button>
+          </div>
+          <div id="scanStatus" class="scanStatus"></div>
+          <div id="scanFallback" class="scanFallback" hidden>
+            <a id="scanGoogleLink" class="ghost" href="https://www.google.com/" target="_blank" rel="noopener">Search Google for this barcode</a>
+            <span>Read the title from the results, then type it in above.</span>
+          </div>
         </div>
-        <div id="scanStatus" class="scanStatus"></div>
-        <div id="scanFallback" class="scanFallback" hidden>
-          <a id="scanGoogleLink" class="ghost" href="https://www.google.com/" target="_blank" rel="noopener">Search Google for this barcode</a>
-          <span>Read the title from the results, then type it in above.</span>
-        </div>
+        <p class="scanSwitch"><button type="button" class="textLink" id="scanModeLink" hidden>Use this computer's camera instead</button></p>
       </div>
     </section>
   </main>
@@ -143,6 +159,11 @@
       <p>Barcodes you scan here are sent to your computer. Keep this page open while you scan.</p>
       <div class="rsPhoneStatus" id="rsPhoneStatus" role="status" aria-live="polite">Connecting to PC…</div>
       <p class="rsPhoneDetail" id="rsPhoneDetail" hidden></p>
+      <div class="rsLimitBanner" id="rsLimitBanner" role="status" hidden>
+        <p id="rsLimitText"></p>
+        <details id="rsPendingDetails"><summary id="rsPendingSummary">Saved barcodes</summary><ul class="rsPendingList" id="rsPendingList"></ul></details>
+        <button class="ghost" id="rsPendingClearBtn" hidden>Clear saved</button>
+      </div>
       <div id="rsScanner" class="scanner">
         <video id="rsVideo" muted playsinline></video>
         <div class="scanGuide"></div>
@@ -150,8 +171,7 @@
       </div>
       <div class="actions">
         <button class="ghost" id="rsRetryBtn" hidden>Try again</button>
-        <button class="primary" id="rsStartBtn">Start scan</button>
-        <button class="ghost" id="rsStopBtn" disabled>Stop</button>
+        <button class="primary" id="rsToggleBtn">Start scan</button>
       </div>
       <div id="rsScanMsg" class="scanStatus"></div>
       <h3 class="rsSentHead">Sent to the computer</h3>
@@ -321,27 +341,8 @@
   </div>
 </div>
 
-<div class="modal" id="rsModal" role="dialog" aria-modal="true" aria-labelledby="rsModalTitle">
-  <div class="modalCard rsModalCard">
-    <div class="modalHead"><h2 id="rsModalTitle">Use phone as scanner</h2><button class="ghost" id="rsModalCloseBtn">Close</button></div>
-    <div class="rsQr" id="rsQr" role="img" aria-label="QR code for pairing your phone" hidden></div>
-    <p class="rsHow" id="rsHow">Scan this with your phone's camera. Keep this window open.</p>
-    <div class="field" id="rsUrlField" hidden>
-      <label for="rsUrl">Or type this address in the phone's browser</label>
-      <input id="rsUrl" readonly spellcheck="false" autocomplete="off">
-    </div>
-    <div class="rsStatus" id="rsStatus" role="status" aria-live="polite">Connecting…</div>
-    <p class="rsDetail" id="rsDetail" hidden></p>
-    <div class="actions">
-      <button class="ghost" id="rsModalStopBtn">Stop</button>
-      <button class="primary" id="rsRestartBtn" hidden>Try again</button>
-    </div>
-    <p class="rsFine">Both devices need internet (they do not have to be on the same Wi-Fi). Barcodes travel encrypted between the phone and this window and are not stored on any server. Anyone with this QR code can send barcodes here, so stop the session when you are done.</p>
-  </div>
-</div>
-
 <div class="rsPill" id="rsPill" role="status" hidden>
-  <button class="rsPillMain" id="rsPillMain" title="Show the QR code again"><span id="rsPillText">📱 Phone scanner connected</span></button>
+  <button class="rsPillMain" id="rsPillMain" title="Go to the QR code"><span id="rsPillText">📱 Phone scanner connected</span></button>
   <span class="rsPillDot" aria-hidden="true">·</span>
   <button class="rsPillStop" id="rsPillStop">Stop</button>
 </div>
