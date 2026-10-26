@@ -389,6 +389,40 @@ body.selecting .toast{bottom:calc(84px + env(safe-area-inset-bottom, 0px))}
 .clearBtn{padding:6px 14px;font-size:.875rem}
 .empty .ghost{margin-top:14px}
 
+/* ---------- Pick for me (button at the right end of the "Showing …" line, dialog) ---------- */
+.listMeta .pickBtn{margin-left:auto;padding:7px 16px;font-size:.875rem;white-space:nowrap}
+.pickCard{width:min(540px,100%)}
+.pickBody{display:grid;grid-template-columns:150px minmax(0,1fr);gap:18px;align-items:center}
+.pickCover{margin:0;padding:12px;border-radius:18px}   /* the card's coloured placeholder (.cover) at dialog size */
+.pickCover .coverTitle{font-size:1.15rem}
+.pickCover.hasImg .coverTitle{display:none}
+.pickInfo{min-width:0}
+.pickName{margin:0 0 12px;font-size:1.35rem;font-weight:850;letter-spacing:-.03em;line-height:1.1;overflow-wrap:anywhere}
+.pickShelf{display:grid;gap:2px;margin-bottom:8px}
+.pickLabel{color:var(--muted);font-size:.75rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase}
+.pickShelf strong{font-size:1.05rem;overflow-wrap:anywhere}
+.pickMeta{color:var(--soft);font-size:.92rem}
+.pickLent{display:inline-block;margin-top:10px;padding:5px 10px;border-radius:999px;border:1px solid rgba(192,132,252,.42);background:rgba(192,132,252,.13);color:#ead8ff;font-size:.875rem;overflow-wrap:anywhere}
+.pickNote{margin:14px 0 0;color:var(--muted);font-size:.875rem;line-height:1.4}
+#pickSeenBtn[aria-pressed="true"]{color:var(--good)}
+/* ---------- Lent out: chip on cards, field in Movie details ---------- */
+.lentPill{border-color:rgba(192,132,252,.42);background:rgba(192,132,252,.13);color:#ead8ff}
+.movieGrid.compact .rowWhere .lentPill{flex:0 1 auto;min-width:0;max-width:220px;margin-left:4px;padding:2px 9px;border:1px solid rgba(192,132,252,.42);border-radius:999px;background:rgba(192,132,252,.13);color:#ead8ff}
+.lentRow{display:flex;gap:8px;align-items:center}
+.lentRow input{flex:1;min-width:0}
+.lentRow button{flex:none;padding:11px 16px}
+.lentHint{color:var(--muted);font-size:.875rem;line-height:1.35}
+.movieGrid>.empty{grid-column:1/-1}   /* "Nothing is lent out…" / "No movies match…" spans the grid instead of one card column */
+@media (max-width:720px){
+  .chip.lentPill:not(:first-child){display:inline-block}   /* the phone layout hides every chip but the first: this one says the disc is not on its shelf */
+  .movieGrid.compact .rowWhere .lentPill{margin:3px 0 0 4px;font-size:.75rem;max-width:100%;vertical-align:middle}
+  .pickBody{grid-template-columns:112px minmax(0,1fr);gap:14px}
+  .pickCover{padding:8px;border-radius:14px}
+  .pickCover .coverTitle{font-size:.9rem}
+  .pickName{font-size:1.12rem;margin-bottom:10px}
+  .pickCard .actions button{flex:1 1 auto}
+}
+
 /* ---------- controls bar: stays inside the page between 981 and 1219 px ---------- */
 .controls label{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}   /* the long Search label stays on one line now that the Select button takes room */
 @media (min-width:981px) and (max-width:1219px){

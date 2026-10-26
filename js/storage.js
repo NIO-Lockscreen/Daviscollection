@@ -179,8 +179,8 @@ function canShareBackupFiles(){
 function csvCell(v){const s=txt(v); return /[";\r\n]/.test(s) ? '"'+s.replace(/"/g,'""')+'"' : s}
 function collectionCsv(){ // ';' separated + UTF-8 BOM so Norwegian-locale Excel opens it correctly
   const {order,groups}=groupedMovies();
-  const rows=[['Title','Section','Format','Seen','Barcode','Catalog','Notes','Added','Updated','Poster URL']];
-  order.forEach(sec=>groups[sec].forEach(m=>rows.push([m.title,m.section,m.format,m.seen===false?'no':'yes',m.barcode,m.catalog,m.notes,m.added,m.updated,m.poster])));
+  const rows=[['Title','Section','Format','Seen','Barcode','Catalog','Notes','Added','Updated','Poster URL','Lent to','Lent date']];   // lending columns last, so older spreadsheets keep their column letters
+  order.forEach(sec=>groups[sec].forEach(m=>{const lent=txt(m.lentTo).trim(); rows.push([m.title,m.section,m.format,m.seen===false?'no':'yes',m.barcode,m.catalog,m.notes,m.added,m.updated,m.poster,lent,lent?m.lentAt:''])}));
   return '﻿'+rows.map(r=>r.map(csvCell).join(';')).join('\r\n')+'\r\n';
 }
 function exportCsv(){

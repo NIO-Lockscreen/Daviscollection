@@ -4,6 +4,7 @@ const UNSORTED_SECTION = 'UNSORTED / NOT PLACED';
 // Card markup, counters, the "To sort" filter and the Place-on-shelf picker all ask this.
 function isToBeSorted(section){return section===UNSORTED_SECTION || state.toSortShelves.includes(section);}
 const TOSORT_FILTER = '__tosort__';   // pseudo value of the Section filter: every shelf that is still waiting to be sorted
+const LENT_FILTER = '__lent__';       // pseudo value of the Section filter: every disc that is lent out (see lentName)
 const LAST_FORMAT_KEY = 'movieVault.lastFormat';
 const formats = ['All formats','4K UHD','4K Steelbook','Blu-ray','DVD','TV / Series','Blu-ray / DVD','Box set'];
 const els = {};
@@ -84,6 +85,7 @@ function init(){
   window.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal(); closePosterPicker(); closeValueModal(); closeShelfPicker(); if(els.backupMenu.classList.contains('open')){closeBackupMenu(); els.backupMenuBtn.focus();}}});
   initShelves(); restoreLastFormat();
   initBackupUi();
+  initPickForMe(); initLending();
   populateSelects();
   if(!initRemoteScan()) showCollectionView();   // a phone paired through a QR code shows only the remote scanner: no collection render, no cover lookups
 }
@@ -147,15 +149,16 @@ function getDuplicateMap(){const c={}; state.movies.forEach(m=>{const k=titleKey
 function sectionCounts(){const c={}; state.movies.forEach(m=>{c[m.section]=(c[m.section]||0)+1}); return c;}
 // How many titles are on shelves that are still waiting to be sorted.
 function toSortCount(counts=sectionCounts()){return [...new Set([UNSORTED_SECTION, ...state.toSortShelves])].reduce((n,s)=>n+(counts[s]||0),0);}
-// Section filter: "All sections", "To sort (n)" (every to-sort shelf together), then only the shelves that hold titles (with counts) in sectionOrder order. The selected entry always stays listed.
+// Section filter: "All sections", "To sort (n)" (every to-sort shelf together), "Lent out (n)", then only the shelves that hold titles (with counts) in sectionOrder order. The selected entry always stays listed.
 function updateSectionFilter(){
   const counts=sectionCounts(), cur=els.sectionFilter.value || 'all';
   const secs=allShelves().filter(s=>counts[s] || s===cur);
   const nSort=toSortCount(counts), showSort=nSort>0 || cur===TOSORT_FILTER;
-  const sig=(showSort ? nSort : '-')+'\n'+secs.map(s=>s+'\t'+(counts[s]||0)).join('\n');
+  const nLent=lentCount(), showLent=nLent>0 || cur===LENT_FILTER;
+  const sig=(showSort ? nSort : '-')+'\t'+(showLent ? nLent : '-')+'\n'+secs.map(s=>s+'\t'+(counts[s]||0)).join('\n');
   if(sig===sectionFilterSig) return;   // nothing to rebuild: same shelves, same counts
   sectionFilterSig=sig;
-  els.sectionFilter.innerHTML=['<option value="all">All sections</option>', ...(showSort ? [`<option value="${TOSORT_FILTER}">To sort (${nSort})</option>`] : []), ...secs.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)} (${counts[s]||0})</option>`)].join('');
+  els.sectionFilter.innerHTML=['<option value="all">All sections</option>', ...(showSort ? [`<option value="${TOSORT_FILTER}">To sort (${nSort})</option>`] : []), ...(showLent ? [`<option value="${LENT_FILTER}">Lent out (${nLent})</option>`] : []), ...secs.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)} (${counts[s]||0})</option>`)].join('');
   els.sectionFilter.value=cur;
   if(els.sectionFilter.value!==cur) els.sectionFilter.value='all';   // that shelf is gone (renamed, merged or deleted elsewhere)
 }
@@ -163,10 +166,11 @@ function setSectionFilter(sec){
   if(sec!=='all' && ![...els.sectionFilter.options].some(o=>o.value===sec)) els.sectionFilter.add(new Option(sec,sec));   // rebuilt with its count by the next render
   els.sectionFilter.value=sec;
 }
-// Section clause of getFiltered: a shelf name, 'all', or TOSORT_FILTER (every shelf that is waiting to be sorted).
+// Section clause of getFiltered: a shelf name, 'all', TOSORT_FILTER (every shelf that is waiting to be sorted) or LENT_FILTER (every disc that is lent out).
 function sectionMatcher(sec){
   if(sec==='all') return ()=>true;
   if(sec===TOSORT_FILTER){const set=new Set([UNSORTED_SECTION, ...state.toSortShelves]); return m=>set.has(m.section);}
+  if(sec===LENT_FILTER) return m=>!!lentName(m);
   return m=>m.section===sec;
 }
 /* ---------- Search: forgiving matching ----------
@@ -187,14 +191,14 @@ function parseSearchQuery(text){   // null when nothing searchable is typed
 }
 const searchCache=new Map();   // movie id -> prepared fields, rebuilt when the movie's text changed
 const searchEntryProto={
-  // Every query word is in the blob (title, shelf, format, barcode, notes; 1-2 digit numbers as whole words, so "2" is not "12" or "26246"),
+  // Every query word is in the blob (title, shelf, format, barcode, notes, borrower; 1-2 digit numbers as whole words, so "2" is not "12" or "26246"),
   // or the squashed query sits inside the squashed title ("spiderman" in SPIDER-MAN, "xmen" in X-MEN).
   includes(q){
     return q.words.every(w=>/^\d{1,2}$/.test(w) ? this.blobWords.has(w) : this.blob.includes(w)) || this.sq.includes(q.sq) || this.sqn.includes(q.sqn);
   }
 };
 function searchEntry(m){
-  const raw=[m.title,m.section,m.format,m.barcode,m.notes].join('\u0001');
+  const raw=[m.title,m.section,m.format,m.barcode,m.notes,lentName(m)].join('\u0001');
   let e=searchCache.get(m.id);
   if(!e || e.raw!==raw){
     const title=normalizeForSearch(m.title), blob=normalizeForSearch(raw);
@@ -264,7 +268,8 @@ function render(opts){
   updateSelectBar();
   if(!list.length){
     const placed = els.sectionFilter.value===TOSORT_FILTER && !state.movies.some(m=>isToBeSorted(m.section));
-    els.movieGrid.innerHTML=`<div class="empty">${placed?'Nothing is waiting to be sorted: every title is on a shelf.':'No movies match this filter.'}${isFilterActive()?'<div><button class="ghost" data-clear-filters>Clear filters</button></div>':''}</div>`;
+    const home = els.sectionFilter.value===LENT_FILTER && !lentCount();
+    els.movieGrid.innerHTML=`<div class="empty">${placed?'Nothing is waiting to be sorted: every title is on a shelf.':home?'Nothing is lent out: every disc is at home.':'No movies match this filter.'}${isFilterActive()?'<div><button class="ghost" data-clear-filters>Clear filters</button></div>':''}</div>`;
     watchGridEnd();
     return;
   }
@@ -395,6 +400,7 @@ function cardHtml(m, dupeCount){
   const seenChip = m.seen===false ? '<span class="chip unseenPill">Not seen</span>' : '<span class="chip seenPill">Seen</span>';
   const removedChip = (!m.poster && m.posterRemoved===true) ? '<span class="chip posterRemovedPill">Poster removed</span>' : '';
   const checkChip = coverChipHtml(m);
+  const lent = lentChipHtml(m);   // cover view: next to the shelf chip; list view: after shelf · format
   const needsPoster = !m.poster && m.posterRemoved!==true;
   const isSel = selectMode && selected.has(m.id);
   const selBox = selectMode ? `<input type="checkbox" class="selBox" tabindex="-1" aria-label="Select ${escapeHtml(m.title)}"${isSel?' checked':''}>` : '';
@@ -402,7 +408,7 @@ function cardHtml(m, dupeCount){
   const placeBtn = isToBeSorted(m.section) ? `<button class="miniBtn placeBtn" data-place="${id}">Place on shelf</button>` : '';
   if(compact){
     return `<article class="${cls}" data-id="${id}" data-needs-poster="${needsPoster?'true':'false'}" style="--hue:${hue}">${selBox}
-      <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><span class="rowWhere">${els.sortSelect.value==='shelf' ? '' : `<span class="rowShelf">${escapeHtml(m.section)}</span> `}<span class="rowFmt">${escapeHtml(m.format)}</span></span><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${checkChip}${seenChip}${removedChip}${dupe}${barcode}</div><div class="formatBadge">${escapeHtml(m.format)}</div>${placeBtn}</div>
+      <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><span class="rowWhere">${els.sortSelect.value==='shelf' ? '' : `<span class="rowShelf">${escapeHtml(m.section)}</span> `}<span class="rowFmt">${escapeHtml(m.format)}</span>${lent}</span><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${checkChip}${seenChip}${removedChip}${dupe}${barcode}</div><div class="formatBadge">${escapeHtml(m.format)}</div>${placeBtn}</div>
     </article>`;
   }
   const img = m.poster ? `<img src="${escapeHtml(m.poster)}" alt="Cover for ${escapeHtml(m.title)}" loading="lazy" onerror="this.remove()">` : '';
@@ -411,7 +417,7 @@ function cardHtml(m, dupeCount){
   const extra = placeBtn || coverBtns ? `<div class="cardExtra">${placeBtn}${coverBtns}</div>` : '';
   return `<article class="${cls}" data-id="${id}" data-needs-poster="${needsPoster?'true':'false'}" style="--hue:${hue}">${selBox}
     <div class="cover">${img}<div class="coverTitle">${escapeHtml(shortCoverTitle(m.title))}</div><div class="formatBadge">${escapeHtml(m.format)}</div></div>
-    <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${checkChip}${removedChip}${dupe}${barcode}</div>${m.notes?`<div class="notes">${escapeHtml(m.notes)}</div>`:''}<div class="cardActions"><button type="button" class="${sv.cls}" data-toggle-seen="${id}" aria-pressed="${seen}" title="${sv.title}">${sv.text}</button></div>${extra}</div>
+    <div class="body"><h3 class="title">${escapeHtml(m.title)}</h3><div class="meta"><span class="chip">${escapeHtml(m.section)}</span>${lent}${checkChip}${removedChip}${dupe}${barcode}</div>${m.notes?`<div class="notes">${escapeHtml(m.notes)}</div>`:''}<div class="cardActions"><button type="button" class="${sv.cls}" data-toggle-seen="${id}" aria-pressed="${seen}" title="${sv.title}">${sv.text}</button></div>${extra}</div>
   </article>`;
 }
 // Look of the seen toggle on a card; toggleSeen() repaints an existing button from the same values.
@@ -457,6 +463,7 @@ function openEdit(id){
   const m=state.movies.find(x=>x.id===id); if(!m) return;
   editingId=id;
   els.editMovieTitle.value=m.title; els.editSection.value=m.section; els.editCustomSection.value=''; els.editFormat.value=m.format; els.editBarcode.value=m.barcode; els.editSeen.checked=m.seen!==false; els.editPoster.value=m.poster; els.editNotes.value=m.notes;
+  fillLending(m);
   updateEditPreview();
   $('editAdvanced').open=false;
   els.editModal.classList.add('active');
@@ -490,6 +497,7 @@ function saveEdit(){
   const oldPoster = m.poster || '';
   const nextPoster = els.editPoster.value.trim();
   m.title=title; m.section=getSectionFromForm('edit'); m.format=els.editFormat.value; m.barcode=els.editBarcode.value.trim(); m.seen=!!els.editSeen.checked; m.poster=nextPoster; m.posterRemoved=nextPoster ? false : !!(oldPoster || m.posterRemoved); m.notes=els.editNotes.value.trim(); m.updated=today();
+  applyLending(m);
   if(!nextPoster) delete m.posterSource; else if(nextPoster!==oldPoster) m.posterSource='manual';   // picked or pasted by the user (a kept auto cover stays 'auto')
   if(nextPoster!==oldPoster) delete m.posterSuggestion;   // a different cover makes the old suggestion moot
   save(); populateSelects(); render(); closeModal(); toast('Saved changes.');
@@ -525,6 +533,97 @@ function toggleSeen(id){
     populateStats();
   }else render();
   toast(m.seen ? 'Marked as seen.' : 'Marked as not seen.');
+}
+/* ---------- Pick for me: a random title from the list on screen ---------- */
+let pickId = '';   // the title the dialog shows; kept after closing, so the next pick is a different one too
+function initPickForMe(){
+  ['pickBtn','pickModal','pickBody','pickNote','pickAgainBtn','pickSeenBtn','pickDetailsBtn','pickCloseBtn'].forEach(id=>els[id]=$(id));
+  els.pickBtn.addEventListener('click', pickForMe);
+  els.pickAgainBtn.addEventListener('click', pickForMe);
+  els.pickSeenBtn.addEventListener('click',()=>{if(pickId){toggleSeen(pickId); showPick();}});   // same toggle as the card: repaints the card and the counters
+  els.pickDetailsBtn.addEventListener('click',()=>{const id=pickId; closePickModal(); openEdit(id);});
+  els.pickCloseBtn.addEventListener('click', closePickModal);
+  els.pickModal.addEventListener('click',e=>{if(e.target===els.pickModal) closePickModal();});
+  window.addEventListener('keydown',e=>{if(e.key==='Escape' && els.pickModal.classList.contains('active')) closePickModal();});
+}
+// What to pick from: the filtered list (read fresh, so a search still being typed counts), discs at home before lent-out ones, unseen titles first.
+function pickPool(){
+  const list=getFiltered(), home=list.filter(m=>!lentName(m)), base=home.length ? home : list, unseen=base.filter(m=>m.seen===false);
+  const lentLeftOut = base!==list && list.some(m=>lentName(m) && (m.seen===false || !unseen.length));   // only when a lent disc would have been a candidate
+  return {pool:unseen.length ? unseen : base, unseen:unseen.length>0, lentLeftOut};
+}
+function pickForMe(){
+  const p=pickPool();
+  if(!p.pool.length){toast('No titles match the current filters, so there is nothing to pick from.'); return;}
+  const choices=p.pool.length>1 ? p.pool.filter(m=>m.id!==pickId) : p.pool;   // never the same title twice in a row
+  pickId=choices[Math.floor(Math.random()*choices.length)].id;
+  const n=p.pool.length, where=(isFilterActive() ? 'in this list' : 'in your collection')+(p.lentLeftOut ? ' (discs that are lent out are skipped)' : '');
+  els.pickNote.textContent = p.unseen ? (n===1 ? `The only unseen title ${where}.` : `Picked at random from ${n.toLocaleString()} unseen titles ${where}.`)
+    : (n===1 ? `The only title ${where}.` : `You have seen every title ${where}, so this is a pick from all ${n.toLocaleString()}.`);
+  showPick(p);
+  if(!els.pickModal.classList.contains('active')) openPickModal();
+}
+// Draws the picked title: cover (or the card's coloured placeholder), title, shelf, format, seen, borrower. p = pickPool() when the caller has it.
+function showPick(p){
+  const m=state.movies.find(x=>x.id===pickId); if(!m){closePickModal(); return;}
+  const seen=m.seen!==false, who=lentName(m);
+  const img=m.poster ? `<img src="${escapeHtml(m.poster)}" alt="Cover for ${escapeHtml(m.title)}" onerror="this.parentElement.classList.remove('hasImg'); this.remove()">` : '';
+  els.pickBody.innerHTML=`<div class="cover pickCover${img?' hasImg':''}" style="--hue:${hueFor(m.title)}">${img}<div class="coverTitle">${escapeHtml(shortCoverTitle(m.title))}</div></div>
+    <div class="pickInfo"><h3 class="pickName">${escapeHtml(m.title)}</h3><div class="pickShelf"><span class="pickLabel">Shelf</span><strong>${escapeHtml(m.section)}</strong></div><div class="pickMeta">${escapeHtml(m.format)} · ${seen?'Seen':'Not seen yet'}</div>${who?`<div class="pickLent">Lent to ${escapeHtml(who)}${m.lentAt?' since '+escapeHtml(formatAdded(m.lentAt)):''}</div>`:''}</div>`;
+  els.pickSeenBtn.textContent = seen ? 'Seen ✓' : 'Mark seen';
+  els.pickSeenBtn.title = seen ? 'Seen. Tap to mark as not seen.' : 'Mark this title as seen';
+  els.pickSeenBtn.setAttribute('aria-pressed', String(seen));
+  els.pickAgainBtn.disabled = !(p || pickPool()).pool.some(x=>x.id!==pickId);   // nothing else to pick (the note says why)
+}
+function openPickModal(){
+  els.pickModal.classList.add('active');
+  setTimeout(()=>(els.pickAgainBtn.disabled ? els.pickCloseBtn : els.pickAgainBtn).focus({preventScroll:true}),30);
+}
+function closePickModal(){
+  if(!els.pickModal.classList.contains('active')) return;
+  els.pickModal.classList.remove('active');
+  els.pickBtn.focus({preventScroll:true});
+}
+/* ---------- Lent out: m.lentTo (the borrower's name) and m.lentAt (YYYY-MM-DD), set in Movie details ---------- */
+function lentName(m){return m && typeof m.lentTo==='string' ? m.lentTo.trim() : '';}   // '' = at home (also for odd values from an imported file)
+function lentCount(){let n=0; state.movies.forEach(m=>{if(lentName(m)) n++;}); return n;}
+function lentChipHtml(m){
+  const who=lentName(m); if(!who) return '';
+  return `<span class="chip lentPill" title="Lent to ${escapeHtml(who)}${m.lentAt?' since '+escapeHtml(formatAdded(m.lentAt)):''}">Lent to ${escapeHtml(who)}</span>`;
+}
+function initLending(){
+  ['editLentTo','returnedBtn','lentHint'].forEach(id=>els[id]=$(id));
+  els.editLentTo.addEventListener('input', updateLentHint);
+  els.returnedBtn.addEventListener('click', markReturned);
+}
+function fillLending(m){els.editLentTo.value=lentName(m); els.returnedBtn.hidden=!lentName(m); updateLentHint();}
+// The line under the field says what Save will do with the name.
+function updateLentHint(){
+  const m=state.movies.find(x=>x.id===editingId), was=lentName(m), who=els.editLentTo.value.trim();
+  const text = !who ? (was ? 'Save to mark it as back home.' : '') : who===was ? (m.lentAt ? `Lent since ${formatAdded(m.lentAt)}.` : '') : 'Lent from today once you save.';
+  els.lentHint.textContent=text; els.lentHint.hidden=!text;
+}
+// Called by saveEdit: a new or different name gets today's (local) date, an empty name removes both fields.
+function applyLending(m){
+  const who=els.editLentTo.value.trim();
+  if(!who){delete m.lentTo; delete m.lentAt;}
+  else if(who!==lentName(m)){m.lentTo=who; m.lentAt=localDateStamp();}
+}
+// "Returned" in Movie details: clears the name and saves the dialog like Save changes, then offers Undo.
+function markReturned(){
+  const m=state.movies.find(x=>x.id===editingId); if(!lentName(m)) return;
+  const before={lentTo:m.lentTo, lentAt:m.lentAt};
+  els.editLentTo.value=''; saveEdit();
+  if(lentName(m)) return;   // not saved (saveEdit said why, e.g. an empty title)
+  if(els.toast.classList.contains('warn') && els.toast.classList.contains('show')) return;   // a save warning is showing: do not bury it
+  toast(`Marked “${m.title}” as returned.`, 8000, {warn:false, action:{label:'Undo', fn:()=>undoReturned(m.id, before)}});
+}
+function undoReturned(id, before){
+  const m=state.movies.find(x=>x.id===id); if(!m || lentName(m)) return;   // lent again in the meantime: keep that
+  m.lentTo=before.lentTo; if(before.lentAt) m.lentAt=before.lentAt; m.updated=today();
+  const ok=save(); render();
+  if(editingId===id) fillLending(m);
+  if(ok) toast(`Lent to ${lentName(m)} again.`);
 }
 /* ---------- Select mode + moving titles to a shelf ---------- */
 function setSelectMode(on){

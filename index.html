@@ -76,7 +76,7 @@
       </div>
     </section>
 
-    <div class="listMeta"><span class="resultLine"><span id="resultText" aria-live="polite">Showing 0 titles</span><button class="ghost clearBtn" id="clearFiltersBtn" hidden>Clear filters</button></span></div>
+    <div class="listMeta"><span class="resultLine"><span id="resultText" aria-live="polite">Showing 0 titles</span><button class="ghost clearBtn" id="clearFiltersBtn" hidden>Clear filters</button></span><button type="button" class="ghost pickBtn" id="pickBtn" title="Pick a random title from the list below, unseen titles first">Pick for me</button></div>
     <section id="movieGrid" class="movieGrid"></section>
     <div id="gridSentinel" class="gridSentinel" aria-hidden="true"></div>
   </main>
@@ -206,6 +206,7 @@
       <div class="field"><label for="editFormat">Format</label><select id="editFormat"><option>4K UHD</option><option>4K Steelbook</option><option>Blu-ray</option><option>DVD</option><option>TV / Series</option><option>Blu-ray / DVD</option><option>Box set</option></select></div>
       <div class="field"><label for="editBarcode">Barcode</label><input id="editBarcode" inputmode="numeric"></div>
       <div class="field full"><label class="checkLine"><input id="editSeen" type="checkbox"> Mark as seen</label></div>
+      <div class="field full"><label for="editLentTo">Lent to</label><div class="lentRow"><input id="editLentTo" placeholder="Name, if the disc is lent out" autocomplete="off"><button type="button" class="ghost" id="returnedBtn" title="The disc is back home: clear the name and save" hidden>Returned</button></div><small class="lentHint" id="lentHint" hidden></small></div>
       <div class="field full"><label for="editNotes">Notes</label><textarea id="editNotes"></textarea></div>
       <details class="full advanced" id="editAdvanced"><summary>Advanced</summary><div class="field"><label for="editPoster">Cover image URL</label><input id="editPoster"></div></details>
     </div>
@@ -337,6 +338,19 @@
     <div class="actions">
       <button class="ghost" id="shelfCancelBtn">Cancel</button>
       <button class="primary" id="shelfOkBtn">Move</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal" id="pickModal" role="dialog" aria-modal="true" aria-labelledby="pickHeading">
+  <div class="modalCard pickCard">
+    <div class="modalHead"><h2 id="pickHeading">Pick for me</h2><button class="ghost" id="pickCloseBtn">Close</button></div>
+    <div class="pickBody" id="pickBody" aria-live="polite"></div>
+    <p class="pickNote" id="pickNote"></p>
+    <div class="actions">
+      <button class="ghost" id="pickDetailsBtn">Details</button>
+      <button class="ghost" id="pickSeenBtn" aria-pressed="false">Mark seen</button>
+      <button class="primary" id="pickAgainBtn">Pick another</button>
     </div>
   </div>
 </div>
