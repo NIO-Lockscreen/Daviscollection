@@ -17,6 +17,7 @@ Selve appen er på engelsk. Denne README-en er på norsk.
 - **Mobilen som skanner for PC-en.** På «Add / scan» på PC-en står det en QR-kode klar under **Scan with your phone**; du skanner den med mobilens vanlige kamera-app, og strekkodene du skanner på mobilen dukker opp live på PC-en. Se avsnittet «Mobilen som skanner for PC-en» under.
 - **Har jeg den allerede?** Når du skanner en strekkode eller skriver en tittel som allerede finnes i samlingen, sier appen fra med en gang («You already own this…» / «You already have…»). Det er nyttig i butikken.
 - **Angre.** Etter at du har slettet en film eller flyttet titler til en hylle, kan du angre i noen sekunder.
+- **Vinduer, Escape og Tilbake-knappen.** Escape lukker bare det øverste vinduet: åpner du plakatvelgeren fra detaljvisningen, lukker Escape bare plakatvelgeren. Tilbake-knappen (Android, også den installerte appen, og nettleseren) lukker det øverste vinduet i stedet for å gå ut av appen, og fra «Add / scan» og «Blueprint export» går den tilbake til fanen du kom fra. Har du endret noe i detaljvisningen uten å lagre, spør appen før endringene forkastes (Close, Escape eller Tilbake); **Save changes** og **Delete** spør ikke om dette. Med tastatur blir Tab inne i vinduet som er åpent, fokus går tilbake dit du var når vinduet lukkes, og fanene kan byttes med piltastene.
 - **Automatiske covers.** Se avsnittet «Coverbilder» under.
 - **«Blueprint»-eksport av samlelista.** Fanen «Blueprint export» lager en samleliste i samme stil som den gamle Word-lista: tittel øverst, seksjonsnavn og stjerne-punkter. Den kan lastes ned som HTML (kan åpnes i Word) eller TXT, eller skrives ut / lagres som PDF. Velg **All shelves** for hele lista, eller én hylle for å skrive ut bare den (nyttig når du rydder en hylle).
 - **Backup.** Menyen «Backup ▾» eksporterer hele samlingen som en JSON-fil (eller et regneark, CSV) og importerer den igjen. Ved import velger du **Merge** (slå sammen) eller **Replace all**, og «Undo last import» angrer. En rød prikk på Backup-knappen minner deg på å ta backup når det er endringer som ikke er sikret.
@@ -174,7 +175,7 @@ js/covers.js           Automatisk cover-oppslag og plakatvelgeren
 js/scanner.js          Strekkodeoppslag og kameraskanner
 api/barcode.js         Serverfunksjon på Vercel: slår opp strekkoder (upcitemdb, Open Product Facts) og husker svarene
 js/remote-scan.js      Mobilen som skanner for PC-en (QR-kode, ntfy.sh-relay, kø med skannede koder)
-js/app.js              Tilstand, oppstart, visning av kort, redigering og verdi
+js/app.js              Tilstand, oppstart, visning av kort, redigering og verdi, vinduer (Escape, fokus, Tilbake-knappen)
 js/pwa.js              Registrerer service workeren (bare på http/https, ikke fra fil)
 icons/                 Appikonet (icon.svg og de ferdige PNG-filene)
 tests/cover-audit/     Fasit og testside for automatiske plakater (se «Sjekke at plakatene blir riktige»)
