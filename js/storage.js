@@ -107,14 +107,28 @@ function normalizeState(input){
   return {schemaVersion:SCHEMA_VERSION, movies, sectionOrder, toSortShelves, importedFrom:input.importedFrom || 'local', importedCount:input.importedCount || movies.length, collectionValue:Number(input.collectionValue || 0), valueHistory:Array.isArray(input.valueHistory)?input.valueHistory:[]};
 }
 function save(){
-  if(!writeState(state)){warnSaveFailed(); return false;}
+  clearTimeout(saveSoonTimer); saveSoonTimer=0;   // this write includes every background change waiting in saveSoon()
+  if(!writeState(state)){warnSaveFailed(); savePending=true; return false;}   // (retried with the next save, or when the page is hidden)
+  savePending=false;
   vaultSet(LAST_CHANGE_KEY, new Date().toISOString());
   updateBackupUi();
   if(activeScreen==='export') updateBlueprintPreview();
   return true;
 }
+/* Background changes (covers found while browsing or by "Load missing covers", a dead cover URL, "Check old covers" results) are written together:
+   at most one write per SAVE_SOON_MS instead of a full ~500 KB JSON.stringify + localStorage write per cover, each of which also made every other
+   open tab re-render (storage event). Nothing waits longer than SAVE_SOON_MS; any save() writes the waiting changes too (it writes the whole state),
+   and hiding or closing the page writes them at once. User actions (edit, add, delete, seen, move, import) keep calling save() directly. */
+const SAVE_SOON_MS=1500;
+let saveSoonTimer=0, savePending=false;
+function markUnsaved(){savePending=true}   // a background change that goes out with the next write (see COVER_CHECK_BATCH in covers.js)
+function saveSoon(){savePending=true; if(!saveSoonTimer) saveSoonTimer=setTimeout(flushSave, SAVE_SOON_MS);}
+function flushSave(){
+  clearTimeout(saveSoonTimer); saveSoonTimer=0;
+  if(savePending && !syncTimer) save();   // (while another tab's newer save waits to be loaded here, older background changes must not overwrite it: syncFromOtherTab drops them)
+}
 function warnSaveFailed(){
-  if(Date.now()-lastSaveWarnAt<6000) return; // covers.js can call save() in bursts
+  if(Date.now()-lastSaveWarnAt<6000) return; // background saves can fail in bursts
   lastSaveWarnAt=Date.now();
   toast('Could not save your collection in this browser (storage is full or unavailable). Export a backup NOW: Backup ▾ → Export JSON backup. Changes made since the last successful save may be lost.', 12000);
 }
@@ -165,11 +179,13 @@ function exportPayload(){return {...state, schemaVersion:SCHEMA_VERSION, exporte
 function backupFilename(){return 'movie-vault-backup-'+localDateStamp()+'.json'}
 function markExported(){vaultSet(LAST_EXPORT_KEY, new Date().toISOString()); updateBackupUi();}
 function exportJson(){
+  flushSave();   // write waiting background changes first, so they do not count as "changed since the last backup"
   downloadBlob(JSON.stringify(exportPayload(),null,2),backupFilename(),'application/json');
   markExported();
   toast('JSON backup exported.');
 }
 async function shareBackup(){
+  flushSave();   // (as in exportJson)
   const file=new File([JSON.stringify(exportPayload(),null,2)], backupFilename(), {type:'application/json'});
   try{
     await navigator.share({files:[file], title:'Movie Vault backup'});
@@ -322,7 +338,8 @@ function syncFromOtherTab(){
     syncTimer=0;
     const next=loadState(true);
     if(next){ // (if the collection was removed or made unreadable elsewhere, keep what is on screen: the next save writes it back)
-      state=next; populateSelects(); render(); updateBackupUi();
+      state=next; clearTimeout(saveSoonTimer); saveSoonTimer=0; savePending=false;   // background changes still waiting here were made to the replaced state
+      populateSelects(); render(); updateBackupUi();
       toast('Collection updated from another tab');
     }
     lastSyncAt=Date.now(); // stamped after the (slow) render
@@ -350,6 +367,8 @@ function initBackupUi(){
   $('importModal')?.addEventListener('click',e=>{if(e.target===$('importModal')) cancelImport();});
   window.addEventListener('keydown',e=>{if(e.key==='Escape') cancelImport();});
   window.addEventListener('storage',onStorageEvent);
+  window.addEventListener('pagehide',flushSave);   // background changes waiting in saveSoon() are written before the page goes away;
+  document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='hidden') flushSave();});   // phones often kill a hidden app without a pagehide
   shareSupported=canShareBackupFiles();
   hasSnapshot=vaultGet(SNAPSHOT_KEY)!==null;
   updateBackupUi();
