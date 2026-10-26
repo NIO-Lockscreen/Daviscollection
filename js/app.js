@@ -696,8 +696,7 @@ function initPickForMe(){
   els.pickSeenBtn.addEventListener('click',()=>{if(pickId){toggleSeen(pickId); showPick();}});   // same toggle as the card: repaints the card and the counters
   els.pickDetailsBtn.addEventListener('click',()=>{const id=pickId; closePickModal(); openEdit(id);});
   els.pickCloseBtn.addEventListener('click', closePickModal);
-  els.pickModal.addEventListener('click',e=>{if(e.target===els.pickModal) closePickModal();});
-  window.addEventListener('keydown',e=>{if(e.key==='Escape' && els.pickModal.classList.contains('active')) closePickModal();});
+  els.pickModal.addEventListener('click',e=>{if(e.target===els.pickModal) closePickModal();});   // (Escape and Back: the dialog stack)
 }
 // What to pick from: the filtered list (read fresh, so a search still being typed counts), discs at home before lent-out ones, unseen titles first.
 function pickPool(){
@@ -730,12 +729,12 @@ function showPick(p){
 }
 function openPickModal(){
   els.pickModal.classList.add('active');
-  setTimeout(()=>(els.pickAgainBtn.disabled ? els.pickCloseBtn : els.pickAgainBtn).focus({preventScroll:true}),30);
+  dialogOpened(els.pickModal, {close:closePickModal, focus:els.pickAgainBtn.disabled ? els.pickCloseBtn : els.pickAgainBtn});
 }
-function closePickModal(){
+function closePickModal(){   // focus goes back to Pick for me (dialogClosed)
   if(!els.pickModal.classList.contains('active')) return;
   els.pickModal.classList.remove('active');
-  els.pickBtn.focus({preventScroll:true});
+  dialogClosed(els.pickModal);
 }
 /* ---------- Lent out: m.lentTo (the borrower's name) and m.lentAt (YYYY-MM-DD), set in Movie details ---------- */
 function lentName(m){return m && typeof m.lentTo==='string' ? m.lentTo.trim() : '';}   // '' = at home (also for odd values from an imported file)
