@@ -60,6 +60,13 @@ appTest('typing a title you already own shows a duplicate warning; adding it cou
   await note.waitFor({ state: 'visible' });
   assert.match(await note.textContent(), /^You already have: THE GODFATHER \([^)]+\)/);
 
+  // As forgiving as search: apostrophes, dashes and a leading "The" do not matter.
+  for (const [typed, owned] of [['daddys home', 'DADDY’S HOME'], ['spiderman homecoming', 'SPIDER-MAN HOMECOMING'], ['godfather', 'THE GODFATHER']]) {
+    await page.fill('#newTitle', typed);
+    await note.waitFor({ state: 'visible' });
+    assert.ok((await note.textContent()).includes(`${owned} (`), `${typed} -> ${await note.textContent()}`);
+  }
+
   await page.fill('#newTitle', 'qqq not in the collection');
   await note.waitFor({ state: 'hidden' });
 
@@ -215,6 +222,8 @@ appTest('Place on shelf moves a to-sort title onto a new shelf, Undo puts it bac
   await clickToastUndo(page);
   await page.waitForFunction((mid) => state.movies.find((m) => m.id === mid).section !== 'HORROR 4K', id);
   assert.equal((await movieById(page, id)).section, from);
+  assert.ok(!(await savedState(page)).sectionOrder.includes('HORROR 4K'), 'the shelf the move created is gone again');
+  assert.equal(await page.locator('#newSection option[value="HORROR 4K"]').count(), 0);
 });
 
 appTest('phone: add a movie, toggle seen and move it with taps', { device: PHONE }, async ({ page }) => {

@@ -141,12 +141,20 @@ appTest('Cancel in the import dialog changes nothing; invalid files are refused'
   assert.deepEqual(await savedState(page), before);
 });
 
-appTest('CSV export has a header row and one row per title', { storage: smallCollection() }, async ({ page }) => {
+// THE GODFATHER is lent out, so its row fills the two lending columns at the end.
+const lentCollection = () => {
+  const s = smallCollection();
+  Object.assign(s.movies.find((m) => m.id === 't-5'), { lentTo: 'Ola N.', lentAt: '2026-03-04' });
+  return s;
+};
+
+appTest('CSV export has a header row and one row per title', { storage: lentCollection() }, async ({ page }) => {
   await openBackupMenu(page);
   const csv = await download(page, () => page.click('#exportCsvBtn'));
   assert.match(csv.name, /^movie-vault-collection-\d{4}-\d{2}-\d{2}\.csv$/);
   const lines = csv.text.replace(/^﻿/, '').trim().split('\r\n');
-  assert.equal(lines[0], 'Title;Section;Format;Seen;Barcode;Catalog;Notes;Added;Updated;Poster URL');
+  assert.equal(lines[0], 'Title;Section;Format;Seen;Barcode;Catalog;Notes;Added;Updated;Poster URL;Lent to;Lent date');
   assert.equal(lines.length, 1 + (await appState(page)).movies.length);
-  assert.ok(lines.includes('HEAT;CRIME;Blu-ray;no;;;;2026-01-01;2026-01-01;'), lines.join('\n'));
+  assert.ok(lines.includes('HEAT;CRIME;Blu-ray;no;;;;2026-01-01;2026-01-01;;;'), lines.join('\n'));
+  assert.ok(lines.includes('THE GODFATHER;CRIME;Blu-ray;yes;;;;2026-01-01;2026-01-01;;Ola N.;2026-03-04'), lines.join('\n'));
 });

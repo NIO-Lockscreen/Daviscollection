@@ -452,10 +452,12 @@ function addMovie(){
   updateTitleDupes(); populateSelects(); render(); renderQueue(); toast(`Added ${movie.title}`);   // (the phone-scanner queue re-checks "already own")
 }
 // Inline note under the Add title field: titles you already own that equal the typed one or start with it (barcode duplicates are scanner.js's job).
+// Forgiving like search ("daddys home", "spiderman", "godfather 2" all count), with a leading The / A / An ignored on both sides.
+function dupeKey(normTitle){return normTitle.replace(/^(?:the|a|an) /,'').replace(/ /g,'');}
 function updateTitleDupes(){
   const note=els.titleDupeNote; if(!note) return;
-  const k=titleKey(els.newTitle.value);
-  const hits = k.length>=3 ? state.movies.filter(m=>titleKey(m.title).startsWith(k)).sort((a,b)=>(titleKey(b.title)===k)-(titleKey(a.title)===k)) : [];
+  const k=dupeKey(normalizeForSearch(els.newTitle.value)), key=m=>dupeKey(searchEntry(m).title);   // searchEntry caches each title's normalised form
+  const hits = k.length>=3 ? state.movies.filter(m=>key(m).startsWith(k)).sort((a,b)=>(key(b)===k)-(key(a)===k)) : [];
   note.hidden = !hits.length;
   note.textContent = hits.length ? 'You already have: '+hits.slice(0,3).map(m=>`${m.title} (${m.section})`).join(', ')+(hits.length>3 ? ` and ${hits.length-3} more` : '') : '';
 }
@@ -721,12 +723,14 @@ function moveToShelf(ids, section){
   if(!ok) return;   // save() already showed its warning
   if(!before.length){toast(`Already on ${section}.`); return;}
   const title=state.movies.find(m=>m.id===before[0][0]).title;
-  toast(before.length===1 ? `Placed “${title}” on ${section}.` : `Moved ${before.length} titles to ${section}.`, 8000, {warn:false, action:{label:'Undo', fn:()=>undoMove(before, section)}});
+  toast(before.length===1 ? `Placed “${title}” on ${section}.` : `Moved ${before.length} titles to ${section}.`, 8000, {warn:false, action:{label:'Undo', fn:()=>undoMove(before, section, newShelf)}});
 }
-function undoMove(before, section){   // only titles still on that shelf are put back
+function undoMove(before, section, newShelf){   // only titles still on that shelf are put back; a shelf the move created goes again once it is empty
   const prev=new Map(before.map(b=>[b[0],b])); let n=0;
   state.movies.forEach(m=>{const b=prev.get(m.id); if(b && m.section===section){m.section=b[1]; m.updated=b[2]; n++;}});
-  const ok=save(); render();
+  const drop=newShelf && !state.movies.some(m=>m.section===section);
+  if(drop){state.sectionOrder=state.sectionOrder.filter(s=>s!==section); state.toSortShelves=state.toSortShelves.filter(s=>s!==section); if(lastShelf===section) lastShelf='';}
+  const ok=save(); if(drop) populateSelects(); render();
   if(ok) toast(`Moved ${n} title${n===1?'':'s'} back.`);
 }
 
