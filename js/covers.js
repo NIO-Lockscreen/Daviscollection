@@ -82,11 +82,7 @@ function setupCoverSettingsUi(){
   });
   $('coverBulkBtn').addEventListener('click', toggleBulkCovers);
   $('coverCheckBtn')?.addEventListener('click', toggleCoverCheck);
-  window.addEventListener('pagehide', flushCoverCheck);
-  // initCovers() runs before app.js registers its own Escape handler, so Escape closes only this dialog when it is on top.
-  window.addEventListener('keydown', e=>{
-    if(e.key==='Escape' && modal.classList.contains('active')){e.stopImmediatePropagation(); closeCoverSettings();}
-  });
+  window.addEventListener('pagehide', flushCoverCheck);   // (Escape and Back: the dialog stack in app.js)
 }
 function openCoverSettings(){
   const modal=$('coverSettingsModal'); if(!modal) return;
@@ -100,8 +96,9 @@ function openCoverSettings(){
   updateBulkUi();
   updateCheckUi();
   modal.classList.add('active');
+  dialogOpened(modal, {close:closeCoverSettings, focus:$('coverSettingsCloseBtn')});   // (its first field, an optional API key, is rarely the reason to come here)
 }
-function closeCoverSettings(){$('coverSettingsModal')?.classList.remove('active');}
+function closeCoverSettings(){const m=$('coverSettingsModal'); if(m){m.classList.remove('active'); dialogClosed(m);}}
 function saveCoverSettings(){
   const oldKey=getTmdbKey(), oldCountry=getCoverSettings().itunesCountry;   // effective key: user key or built-in
   const key=String($('tmdbKeyInput').value||'').trim().replace(/^bearer\s+/i,'').replace(/^["']|["']$/g,'');
@@ -377,12 +374,14 @@ function openPosterPicker(opts){
   els.pickerUrlInput.value = '';
   els.pickerGrid.innerHTML = '';
   els.posterPickerModal.classList.add('active');
+  dialogOpened(els.posterPickerModal, {close:closePosterPicker, focus:touchUi() ? els.pickerCloseBtn : els.pickerSearchInput});
   refreshPickerCandidates(els.pickerSearchInput.value);
 }
 function closePosterPicker(){
   if(posterPickerState) posterPickerState.generation++;
   posterPickerState = null;
   els.posterPickerModal.classList.remove('active');
+  dialogClosed(els.posterPickerModal);
 }
 function openImageSearch(){
   const term=((els.pickerSearchInput.value.trim() || posterPickerState?.title || '')+' movie poster').trim();

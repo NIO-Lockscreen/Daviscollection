@@ -239,9 +239,9 @@ function showImportDialog(){
   $('importMergeInfo').textContent=`adds the movies you don't have yet and keeps the newer version of movies in both (${m.added} to add, ${m.updated} to update). Your current movies stay.`;
   $('importReplaceInfo').textContent=`swaps your whole collection for the ${p.incoming.movies.length} movies in this file.`;
   modal.classList.add('active');
-  setTimeout(()=>$('importMergeBtn')?.focus(),30);
+  dialogOpened(modal, {close:cancelImport, focus:$('importMergeBtn')});   // (Escape and Back cancel the import)
 }
-function closeImportModal(){const m=$('importModal'); if(m) m.classList.remove('active'); pendingImport=null;}
+function closeImportModal(){const m=$('importModal'); if(m){m.classList.remove('active'); dialogClosed(m);} pendingImport=null;}
 function cancelImport(){if(!pendingImport) return; closeImportModal(); toast('Import cancelled. Nothing was changed.');}
 // Saves the current collection so the import can be undone. Returns false if the user chose not to go on without an undo copy.
 function takeSnapshot(){
@@ -341,7 +341,6 @@ function initBackupUi(){
   on('importCancelBtn',cancelImport);
   on('backupMenuBtn',updateBackupUi); // refresh the relative "last backup" text each time the menu is opened
   $('importModal')?.addEventListener('click',e=>{if(e.target===$('importModal')) cancelImport();});
-  window.addEventListener('keydown',e=>{if(e.key==='Escape') cancelImport();});
   window.addEventListener('storage',onStorageEvent);
   shareSupported=canShareBackupFiles();
   hasSnapshot=vaultGet(SNAPSHOT_KEY)!==null;

@@ -643,3 +643,9 @@ body.remoteMode .topbar,body.remoteMode .tabs,body.remoteMode .rsPill{display:no
   .listMeta{margin:10px 2px 8px}
   .stickyActions .primary{flex:1 1 100%}
 }
+
+/* dialogs (see the dialog stack in app.js): the page behind an open dialog does not scroll, and keyboard focus is visible on every button */
+html.dialogOpen body{overflow:hidden;padding-right:var(--scrollbarW,0px)}   /* the padding stands in for the scrollbar, so nothing shifts */
+.modal,.modalCard{overscroll-behavior:contain}
+.modal:focus{outline:none}
+.tab:focus-visible,.ghost:focus-visible,.primary:focus-visible,.danger:focus-visible,.miniBtn:focus-visible,.pickerThumb:focus-visible,.toastBtn:focus-visible,.textLink:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
