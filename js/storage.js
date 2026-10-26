@@ -32,11 +32,13 @@ function writeKey(key,value){
 }
 function writeState(s){return writeKey(STORAGE_KEY, JSON.stringify(s))}
 
-function loadState(){
+// fromOtherTab (syncFromOtherTab): returns null instead of falling back to the seed list when nothing usable is stored, so the tab keeps what is on screen.
+function loadState(fromOtherTab=false){
   let raw=null;
   try{
     raw=localStorage.getItem(STORAGE_KEY);
-    const saved=raw ? JSON.parse(raw) : null;
+    const boot=typeof mvBootSave!=='undefined' && mvBootSave; if(boot) mvBootSave=null;   // index.html already parsed the save at startup (to skip the seed list): reuse it once if it is still the same
+    const saved=boot && boot.raw===raw ? boot.saved : raw ? JSON.parse(raw) : null;
     if(saved && Array.isArray(saved.movies)){
       const s=normalizeState(saved);
       if(!isCurrentSchema(saved)){ // older save: the legacy repairs just ran once, store the result as v2 so they never run again
@@ -48,13 +50,17 @@ function loadState(){
   }catch(e){}
   if(raw){ // something is stored but unusable: keep a copy of it before anything can overwrite it
     if(vaultGet(UNREADABLE_KEY)===null) vaultSet(UNREADABLE_KEY, raw);
+    if(fromOtherTab) return null;
     loadNotice='Your saved collection could not be read, so the built-in list was loaded. The unreadable data is still kept in this browser (movieVault.unreadableSave).';
-    return normalizeState(structuredClone(SEED_DATA));
+    return seedState();
   }
-  const s=normalizeState(structuredClone(SEED_DATA)); // first run: the embedded seed is v1 data, migrated once
-  writeState(s);
+  if(fromOtherTab) return null;
+  const s=seedState(); // first run: the embedded seed is v1 data, migrated once
+  if(s.movies.length) writeState(s);   // (an empty start is never stored: the next start must still load the seed list)
   return s;
 }
+// index.html loads js/seed-data.js only when the save is missing or unreadable at startup; should it be absent anyway, start empty instead of failing.
+function seedState(){return normalizeState(typeof SEED_DATA==='undefined' ? {} : structuredClone(SEED_DATA))}
 function isCurrentSchema(input){return Number(input && input.schemaVersion) >= SCHEMA_VERSION}
 const txt=v=>v==null ? '' : String(v);
 // Current-version data is kept exactly as stored; only missing fields get defaults.
@@ -314,8 +320,9 @@ async function requestPersistence(){
 function syncFromOtherTab(){
   const run=()=>{
     syncTimer=0;
-    if(vaultGet(STORAGE_KEY)!==null){ // (if the collection was removed elsewhere, keep what is on screen: the next save writes it back)
-      state=loadState(); populateSelects(); render(); updateBackupUi();
+    const next=loadState(true);
+    if(next){ // (if the collection was removed or made unreadable elsewhere, keep what is on screen: the next save writes it back)
+      state=next; populateSelects(); render(); updateBackupUi();
       toast('Collection updated from another tab');
     }
     lastSyncAt=Date.now(); // stamped after the (slow) render

@@ -110,7 +110,7 @@ Husk at hver adresse har sin egen lagring (se under): data du legger inn på `lo
 - **Flytt data mellom mobil og PC** med **Backup ▾ → Export JSON backup** på den ene enheten og **Import JSON backup** på den andre.
 - **Ta jevnlig backup som sikkerhetskopi**, for eksempel etter at du har lagt inn flere nye innkjøp. Legg filen et trygt sted (e-post til deg selv, skylagring e.l.). Hvis nettleserdata slettes, privat modus brukes, eller appen fjernes, forsvinner endringene dine hvis du ikke har en backup.
 - **iPhone/Safari:** Safari kan slette data fra nettsteder du ikke har brukt på ca. 7 dager, med mindre appen er lagt til på hjemskjermen. Legg derfor appen til på hjemskjermen (se under) **og** ta backup (Export JSON).
-- Startlista fra `js/seed-data.js` brukes bare første gang, når nettleseren ikke har lagrede data fra før.
+- Startlista fra `js/seed-data.js` brukes bare første gang, når nettleseren ikke har lagrede data fra før (eller hvis de lagrede dataene ikke kan leses; da tas det vare på en kopi av dem i `movieVault.unreadableSave`). Ellers lastes den ikke ned i det hele tatt, så appen starter raskere.
 
 ## Installere som app
 
@@ -168,7 +168,7 @@ manifest.webmanifest   Gjør appen installerbar (navn, farger, ikoner)
 sw.js                  Service worker: offline-støtte for appens egne filer
 .nojekyll              Tom fil, trengs bare for GitHub Pages
 css/styles.css         Alt av utseende
-js/seed-data.js        Startlista med titler (brukes bare første gang)
+js/seed-data.js        Startlista med titler (lastes bare første gang, eller hvis lagrede data ikke kan leses)
 js/storage.js          Lagring i localStorage, normalisering, JSON-backup, blueprint-eksport
 js/covers.js           Automatisk cover-oppslag og plakatvelgeren
 js/scanner.js          Strekkodeoppslag og kameraskanner
@@ -180,7 +180,7 @@ icons/                 Appikonet (icon.svg og de ferdige PNG-filene)
 tests/cover-audit/     Fasit og testside for automatiske plakater (se «Sjekke at plakatene blir riktige»)
 ```
 
-Skriptene er vanlige `<script>`-tagger (ikke moduler) som lastes i den rekkefølgen som står i `index.html`, slik at appen også virker når `index.html` åpnes direkte fra disk. `js/pwa.js` lastes sist.
+Skriptene er vanlige `<script>`-tagger (ikke moduler) som lastes i den rekkefølgen som står i `index.html`, slik at appen også virker når `index.html` åpnes direkte fra disk. `js/pwa.js` lastes sist. Unntaket er `js/seed-data.js`: en liten sjekk i `index.html` (rett før `js/storage.js`) legger den bare til når nettleseren ikke har lagrede data som kan leses, og da lastes den før resten, akkurat som før.
 
 ### Oppdateringer og cache-versjon
 

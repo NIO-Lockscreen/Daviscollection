@@ -360,7 +360,21 @@
 
 <div id="toast" class="toast"></div>
 
-<script src="js/seed-data.js"></script>
+<script>
+/* The built-in seed list (js/seed-data.js, 426 KB) is only needed on a first run or when the saved collection cannot be read
+   (loadState() in js/storage.js then falls back to it), so a returning user no longer downloads and parses it on every start.
+   The check parses the save once and hands it to loadState() (mvBootSave), so the collection is still parsed only once.
+   Trade-off: document.write is a legacy API, but it is the only way to add an ordinary parser-blocking <script> right here, so
+   SEED_DATA exists before app.js calls loadState() and start-up stays synchronous (no empty grid, no async init). A script added
+   with createElement would run after app.js, and fetch/XHR of local files fail on file://. Browsers only block document.write()'d
+   scripts that are cross-site (Chrome on 2G); this one is same-origin and stays in the sw.js SHELL, so a first run still works
+   offline and waits for it exactly as before. The key is STORAGE_KEY in js/app.js. */
+var mvBootSave=null;
+(function(){
+  try{var raw=localStorage.getItem('movieVault.privateCollection.v1'), saved=raw && JSON.parse(raw); if(saved && Array.isArray(saved.movies)) mvBootSave={raw:raw, saved:saved};}catch(e){}
+  if(!mvBootSave) document.write('<script src="js/seed-data.js"><\/script>');
+})();
+</script>
 <script src="js/storage.js"></script>
 <script src="js/covers.js"></script>
 <script src="js/scanner.js"></script>
