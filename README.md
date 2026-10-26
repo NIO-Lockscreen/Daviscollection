@@ -81,7 +81,7 @@ GitHub-repoet har `https://daviscollection.vercel.app` som hjemmeside, og siden 
 
 - **Oppdatering skjer automatisk.** Når du pusher eller merger til `main`, lager Vercel en ny utgave av siden av seg selv, vanligvis på under ett minutt. Det er ingenting å bygge: filene serveres akkurat som de ligger i repoet.
 - **Serverfunksjonen.** Mappa `api/` inneholder én serverfunksjon (`api/barcode.js`, strekkodeoppslaget). Vercel finner den selv og publiserer den på `/api/barcode`, uten noe oppsett eller nøkler.
-- **Ingen `vercel.json` er nødvendig.** Vercel sender `Cache-Control: public, max-age=0, must-revalidate` for statiske filer, så nettleseren sjekker alltid om det finnes en nyere versjon. Service workeren (`sw.js`) henter dessuten alltid ferske filer når du er på nett.
+- **Ingen `vercel.json` er nødvendig.** Vercel sender `Cache-Control: public, max-age=0, must-revalidate` for statiske filer, så nettleseren sjekker alltid om det finnes en nyere versjon. Service workeren (`sw.js`) henter dessuten alltid ferske filer når du er på nett (på svært tregt nett starter appen fra den lagrede kopien etter ca. 3 sekunder, se «Oppdateringer og cache-versjon»).
 - **Hvis en endring ikke dukker opp:** åpne prosjektet i Vercel-dashboardet og sjekk at siste deployment under «Deployments» er «Ready», og at Production Branch er `main`. Under Settings → Build and Deployment skal Framework Preset være «Other», og Output Directory skal stå tom (siden ligger i rotmappa).
 
 ### Alternativ: GitHub Pages
@@ -113,7 +113,7 @@ Husk at hver adresse har sin egen lagring (se under): data du legger inn på `lo
 - **Flytt data mellom mobil og PC** med **Backup ▾ → Export JSON backup** på den ene enheten og **Import JSON backup** på den andre.
 - **Ta jevnlig backup som sikkerhetskopi**, for eksempel etter at du har lagt inn flere nye innkjøp. Legg filen et trygt sted (e-post til deg selv, skylagring e.l.). Hvis nettleserdata slettes, privat modus brukes, eller appen fjernes, forsvinner endringene dine hvis du ikke har en backup.
 - **iPhone/Safari:** Safari kan slette data fra nettsteder du ikke har brukt på ca. 7 dager, med mindre appen er lagt til på hjemskjermen. Legg derfor appen til på hjemskjermen (se under) **og** ta backup (Export JSON).
-- Startlista fra `js/seed-data.js` brukes bare første gang, når nettleseren ikke har lagrede data fra før.
+- Startlista fra `js/seed-data.js` brukes bare første gang, når nettleseren ikke har lagrede data fra før (eller hvis de lagrede dataene ikke kan leses; da tas det vare på en kopi av dem i `movieVault.unreadableSave`). Ellers lastes den ikke ned i det hele tatt, så appen starter raskere.
 
 ## Installere som app
 
@@ -127,7 +127,7 @@ Etter installasjon virker appens egne filer uten nett. Samlinga di ligger i nett
 
 ## Coverbilder
 
-- **Automatisk.** Når et kort uten cover kommer til syne mens du blar, slår appen opp filmen og lagrer plakaten. Wikipedia brukes til å fastslå *hvilken* film tittelen er, og om flere filmer deler navnet. Plakaten hentes så fra TMDB, iTunes eller Wikipedia, og bare når tittel og år stemmer med den filmen. Bildet må laste og være stående (plakatformat), slik at pressefoto, logoer og tittelskjermer aldri brukes.
+- **Automatisk.** Når et kort uten cover kommer til syne mens du blar, slår appen opp filmen og lagrer plakaten. Plakater som blir funnet automatisk, lagres samlet (høyst én gang per 1,5 sekund, og med en gang når appen lukkes eller legges i bakgrunnen), så lagringen og andre åpne faner ikke må jobbe for hver eneste plakat. Wikipedia brukes til å fastslå *hvilken* film tittelen er, og om flere filmer deler navnet. Plakaten hentes så fra TMDB, iTunes eller Wikipedia, og bare når tittel og år stemmer med den filmen. Bildet må laste og være stående (plakatformat), slik at pressefoto, logoer og tittelskjermer aldri brukes.
 - **Heller ingen plakat enn feil plakat.** Er tittelen tvetydig, får kortet ingen automatisk plakat. Eksempler: HEAT (1986 og 1995), TITANIC, PSYCHO, eller når både «X» og «The X» finnes som filmer. Det samme gjelder forkortede og feilstavede titler (GARP, RAGINGBULL) og bokser med flere filmer («1, 2 & 3», TRILOGY). Velg da plakaten selv med **Find poster**.
 - **Manuelt.** Trykk **Find poster** (i «Add / scan» eller i detaljvisningen til en film). Da åpnes en velger med forslag fra TMDB, iTunes og Wikipedia. Trykk på riktig plakat, endre søketeksten og søk på nytt, bruk **Google Images**, eller lim inn en egen bilde-URL. En plakat du fjerner eller bytter ut, blir husket som avvist og foreslås ikke igjen. En plakatlenke som slutter å virke, fjernes automatisk, og du kan velge en ny med «Find poster» i detaljvisningen.
 - **Cover settings** (tannhjulet i plakatvelgeren): egen TMDB-nøkkel (valgfritt), land for iTunes-søk, **Load missing covers** (går gjennom alle titler uten plakat, med fremdrift og Avbryt), og tømming av cover-mellomlageret.
@@ -165,7 +165,7 @@ TMDB krever kildehenvisning: *This product uses the TMDB API but is not endorsed
 
 ## Tester
 
-Mappa `tests/e2e/` inneholder automatiske tester. De fleste åpner appen i en ekte nettleser (Chromium, styrt av Playwright), både med PC- og mobilskjerm, og sjekker at det viktigste virker: oppstart uten feil og at startlista lastes, søket («daddys home», «spiderman», «godfather 2»), legge til, endre, slette og angre, sett/ikke sett, **Select** → «Move to shelf…» og angre, hylleoversikten (endre navn, slå sammen, angre), Backup (eksport, import med **Merge** og **Replace all**, «Undo last import»), blueprint for én hylle, og dialogene (Esc lukker bare den øverste, spørsmål om ulagrede endringer, Tab blir i dialogen, tilbakeknappen lukker dialogen i stedet for å forlate appen, **Pick for me**). I tillegg testes noen rene hjelpefunksjoner (strekkodesjekk, migrering av gamle lagringer, sammenslåing ved import), serverfunksjonen `api/barcode.js` med falske svar fra upcitemdb og Open Product Facts, og alle `.js`-filer sjekkes med `node --check`.
+Mappa `tests/e2e/` inneholder automatiske tester. De fleste åpner appen i en ekte nettleser (Chromium, styrt av Playwright), både med PC- og mobilskjerm, og sjekker at det viktigste virker: oppstart uten feil og at startlista lastes, søket («daddys home», «spiderman», «godfather 2»), legge til, endre, slette og angre, sett/ikke sett, **Select** → «Move to shelf…» og angre, hylleoversikten (endre navn, slå sammen, angre), Backup (eksport, import med **Merge** og **Replace all**, «Undo last import»), blueprint for én hylle, og dialogene (Esc lukker bare den øverste, spørsmål om ulagrede endringer, Tab blir i dialogen, tilbakeknappen lukker dialogen i stedet for å forlate appen, **Pick for me**), og oppstart og lagring (startlista lastes bare første gang, plakater som finnes automatisk lagres samlet, appen starter uten nett via service workeren). I tillegg testes noen rene hjelpefunksjoner (strekkodesjekk, migrering av gamle lagringer, sammenslåing ved import), serverfunksjonen `api/barcode.js` med falske svar fra upcitemdb og Open Product Facts, og alle `.js`-filer sjekkes med `node --check`.
 
 Testene går aldri ut på nett: en liten innebygd webserver serverer repoet på en tilfeldig port, og alt annet (coverbilder, strekkodeoppslag, ntfy.sh) blokkeres. En test feiler hvis siden får en JavaScript-feil.
 
@@ -190,7 +190,7 @@ manifest.webmanifest   Gjør appen installerbar (navn, farger, ikoner)
 sw.js                  Service worker: offline-støtte for appens egne filer
 .nojekyll              Tom fil, trengs bare for GitHub Pages
 css/styles.css         Alt av utseende
-js/seed-data.js        Startlista med titler (brukes bare første gang)
+js/seed-data.js        Startlista med titler (lastes bare første gang, eller hvis lagrede data ikke kan leses)
 js/storage.js          Lagring i localStorage, normalisering, JSON-backup, blueprint-eksport
 js/covers.js           Automatisk cover-oppslag og plakatvelgeren
 js/scanner.js          Strekkodeoppslag og kameraskanner
@@ -204,12 +204,12 @@ tests/e2e/             Automatiske tester (Playwright + node --test), kjøres me
 .github/workflows/     CI: kjører testene på GitHub Actions ved push og pull request
 ```
 
-Skriptene er vanlige `<script>`-tagger (ikke moduler) som lastes i den rekkefølgen som står i `index.html`, slik at appen også virker når `index.html` åpnes direkte fra disk. `js/pwa.js` lastes sist.
+Skriptene er vanlige `<script>`-tagger (ikke moduler) som lastes i den rekkefølgen som står i `index.html`, slik at appen også virker når `index.html` åpnes direkte fra disk. `js/pwa.js` lastes sist. Unntaket er `js/seed-data.js`: en liten sjekk i `index.html` (rett før `js/storage.js`) legger den bare til når nettleseren ikke har lagrede data som kan leses, og da lastes den før resten, akkurat som før.
 
 ### Oppdateringer og cache-versjon
 
-Service workeren henter alltid filene fra nettet først, og bruker den lagrede kopien bare når du er uten nett. Når du publiserer en endring og åpner appen på nett, får du derfor den nye versjonen med det samme (på installert app: lukk og åpne den én gang, eller last siden på nytt). Dataene dine i nettleseren påvirkes ikke av oppdateringer.
+Service workeren henter alltid filene fra nettet først, og bruker den lagrede kopien når du er uten nett, eller når nettet er så tregt at siden ikke har kommet etter ca. 3 sekunder (`NETWORK_TIMEOUT_MS` i `sw.js`). Da starter appen fra den lagrede kopien (alle filene fra samme versjon), mens nedlastingen fortsetter i bakgrunnen og oppdaterer kopien til neste oppstart. Kommer siden fra nettet, venter den også på skriptene fra nettet, så ny og gammel versjon blandes aldri. Når du publiserer en endring og åpner appen på nett, får du derfor den nye versjonen med det samme (på installert app: lukk og åpne den én gang, eller last siden på nytt; på svært tregt nett kommer den ved neste oppstart). Dataene dine i nettleseren påvirkes ikke av oppdateringer.
 
-Skal du tvinge alle installerte kopier til å laste ned alt på nytt, endrer du `CACHE_VERSION` øverst i `sw.js` (for eksempel fra `'v1'` til `'v2'`). Den nye service workeren henter da alle filer på nytt og sletter den gamle cachen. Legger du til en ny fil i appen (for eksempel et nytt skript i `js/`), tar du den også med i `SHELL`-lista i `sw.js` og øker versjonen, slik at den er tilgjengelig uten nett fra første stund.
+Skal du tvinge alle installerte kopier til å laste ned alt på nytt, endrer du `CACHE_VERSION` øverst i `sw.js` (for eksempel fra `'v5'` til `'v6'`). Den nye service workeren henter da alle filer på nytt og sletter den gamle cachen. Legger du til en ny fil i appen (for eksempel et nytt skript i `js/`), tar du den også med i `SHELL`-lista i `sw.js` og øker versjonen, slik at den er tilgjengelig uten nett fra første stund. `js/seed-data.js` skal stå i `SHELL` selv om den bare lastes første gang, så også en første oppstart virker uten nett.
 
 Ikonene er laget ut fra `icons/icon.svg` (vanlig ikon) og `icons/icon-maskable.svg` (full-bleed, brukes til maskable-ikonet og iPhone-ikonet).

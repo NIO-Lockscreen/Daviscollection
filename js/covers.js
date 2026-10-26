@@ -27,11 +27,11 @@ let tmdbRejected = false;         // TMDB answered 401 this session: skip it unt
 let coverBulk = null;             // running "Load missing covers" job
 let coverBulkSummary = '';
 const coverCheckQueue = [];       // "Check old covers": served after visible cards and the bulk load
-const COVER_CHECK_BATCH = 25;     // results are saved in batches of this many, not once per movie
+const COVER_CHECK_BATCH = 25;     // results schedule a write (saveSoon) once per this many; in between they go out with any other save, or when the page is hidden or closed
 const COVER_CHECK_OFFLINE_STREAK = 12;   // this many network errors in a row (no answer in between) stop the check
 let coverCheck = null;            // running "Check old covers" job
 let coverCheckSummary = '';
-let coverCheckDirty = 0;          // checked movies not saved yet
+let coverCheckDirty = 0;          // checked movies since the last scheduled write
 let oldCoverHintShown = false;
 
 function initCovers(){
@@ -82,7 +82,7 @@ function setupCoverSettingsUi(){
   });
   $('coverBulkBtn').addEventListener('click', toggleBulkCovers);
   $('coverCheckBtn')?.addEventListener('click', toggleCoverCheck);
-  window.addEventListener('pagehide', flushCoverCheck);   // (Escape and Back: the dialog stack in app.js)
+  // (Escape and Back: the dialog stack in app.js; unsaved check results are written by flushSave on pagehide, see storage.js)
 }
 function openCoverSettings(){
   const modal=$('coverSettingsModal'); if(!modal) return;
@@ -242,7 +242,8 @@ async function checkLegacyCover(id){
     if(result?.posterUrl) m.posterSuggestion=result.posterUrl; else delete m.posterSuggestion;
   }
   syncCardCoverFlags(id);
-  if(++coverCheckDirty>=COVER_CHECK_BATCH) flushCoverCheck();
+  markUnsaved();
+  if(++coverCheckDirty>=COVER_CHECK_BATCH){coverCheckDirty=0; saveSoon();}
   return m.posterSource==='auto' ? 'confirmed' : 'review';
 }
 function noteCoverCheck(id, outcome){
@@ -256,16 +257,12 @@ function noteCoverCheck(id, outcome){
   else if(job.ids.size) updateCheckUi();
   else finishCoverCheck('done');
 }
-function flushCoverCheck(){
-  if(!coverCheckDirty) return;
-  if(save()) coverCheckDirty=0;
-}
 function finishCoverCheck(how){
   const job=coverCheck;
   clearInterval(job.timer);
   coverCheck=null;
   coverCheckQueue.length=0;
-  flushCoverCheck();
+  coverCheckDirty=0; flushSave();
   const n=v=>v.toLocaleString();
   coverCheckSummary=(how==='cancelled' ? 'Stopped. ' : how==='offline' ? 'Stopped: the cover services could not be reached. ' : '')
     +`${n(job.confirmed+job.review)} checked: ${n(job.confirmed)} confirmed, ${n(job.review)} need a look`
@@ -509,7 +506,7 @@ async function autoLoadVisibleCover(id){
     const m=state.movies.find(x=>x.id===id);
     if(!m || m.poster || m.posterRemoved===true) return 'skipped';
     m.poster=result.posterUrl; m.posterSource='auto'; delete m.posterSuggestion; m.posterRemoved=false; m.updated=today();
-    save();
+    saveSoon();   // background: one write for every cover found within SAVE_SOON_MS (storage.js), not one per cover
     updateCardPoster(id, result.posterUrl, m.title);
     return 'found';
   }catch(e){
@@ -1485,7 +1482,7 @@ function onCoverImageError(e){
   m.updated=today();
   autoCoverQueued.delete(id);
   autoCoverFailedSession.add(id);   // do not retry in a loop this session
-  save();
+  saveSoon();   // (a page of dead URLs fails at once: one write for all of them)
   card.dataset.needsPoster='true';
   card.querySelectorAll('.cover img').forEach(i=>i.remove());
   markCardLoading(id,false);

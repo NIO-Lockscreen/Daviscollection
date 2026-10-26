@@ -122,7 +122,7 @@ async function openApp(opts = {}) {
     ...(opts.device || DESKTOP),
     locale: 'en-US',
     timezoneId: 'Europe/Oslo',
-    serviceWorkers: 'block',   // keep the network deterministic: no service worker between the page and page.route
+    serviceWorkers: opts.serviceWorkers || 'block',   // keep the network deterministic: no service worker between the page and page.route (startup.test.js allows it for the offline test)
     acceptDownloads: true,
   });
   const blocked = [];
