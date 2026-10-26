@@ -23,7 +23,7 @@ function $(id){return document.getElementById(id)}
 function init(){
   ['totalCount','totalLabel','totalStat','duplicatesStat','duplicateCount','duplicateMicro','smartFilterStat','smartFilterLabel','smartFilterMicro','fourKCount','collectionValue','collectionValueStat','searchInput','sectionFilter','formatFilter','seenFilter','sortSelect','unsortedBtn','viewToggle','movieGrid','resultText','newTitle','newSection','customSection','newFormat','newBarcode','newSeen','newPoster','newNotes','addMovieBtn','posterLookupBtn','barcodeLookupBtn','scanner','scanVideo','scannerText','scanToggleBtn','scanStatus','backupMenuBtn','backupMenu','exportJsonBtn','importBtn','importFile','blueprintPreview','downloadBlueprintBtn','downloadBlueprintTextBtn','printBlueprintBtn','editModal','editPreview','closeModalBtn','editMovieTitle','editSection','editCustomSection','editFormat','editBarcode','editSeen','editPoster','editNotes','deleteMovieBtn','removePosterBtn','editPosterLookupBtn','saveEditBtn','valueModal','valueCloseBtn','valueCurrentText','valueMode','valueAmount','valueNote','valuePreviewText','valueWarning','valueConfirmLine','valueConfirm','rollbackValueBtn','applyValueBtn','valueHistoryList','toast','posterPickerModal','pickerTitle','pickerSubtitle','pickerSearchInput','pickerSearchBtn','pickerStatus','pickerGrid','pickerUrlInput','pickerUrlBtn','pickerCloseBtn','gridSentinel','clearFiltersBtn','selectToggle','selectBar','selectCount','selectAllBtn','selectMoveBtn','selectSeenBtn','selectUnseenBtn','selectCancelBtn','titleDupeNote','shelfModal','shelfTitle','shelfWhat','shelfSelect','shelfNewField','shelfNewInput','shelfOkBtn','shelfCancelBtn'].forEach(id=>els[id]=$(id));
   initCovers();
-  document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>showScreen(btn.dataset.screen)));
+  document.querySelectorAll('.tab').forEach(btn=>btn.addEventListener('click',()=>goToTab(btn.dataset.screen)));
   els.searchInput.addEventListener('input',()=>{clearTimeout(searchTimer); searchTimer=setTimeout(renderFresh,150);});   // debounced: no full re-render per keystroke
   els.searchInput.addEventListener('keydown',e=>{if(e.key==='Enter'){clearTimeout(searchTimer); renderFresh();}});
   ['sectionFilter','formatFilter','seenFilter','sortSelect'].forEach(id=>els[id].addEventListener('input', renderFresh));
@@ -75,23 +75,160 @@ function init(){
   els.downloadBlueprintBtn.addEventListener('click',exportBlueprintHtml);
   els.downloadBlueprintTextBtn.addEventListener('click',exportBlueprintText);
   els.printBlueprintBtn.addEventListener('click',printBlueprint);
-  els.closeModalBtn.addEventListener('click',closeModal);
+  els.closeModalBtn.addEventListener('click',requestCloseEdit);
   els.saveEditBtn.addEventListener('click',saveEdit);
   els.deleteMovieBtn.addEventListener('click',deleteEditingMovie);
-  els.removePosterBtn.addEventListener('click',()=>{if(editingId) removePoster(editingId,{keepModal:true});});
+  els.removePosterBtn.addEventListener('click',()=>{if(!editingId) return; removePoster(editingId,{keepModal:true}); if(editBase && !els.editPoster.value) editBase.set(els.editPoster,'');});   // (saved at once: not an unsaved change)
   els.editPosterLookupBtn.addEventListener('click',()=>lookupPosterForForm('edit'));
   ['editMovieTitle','editPoster','editSection','editFormat','editBarcode','editSeen'].forEach(id=>els[id].addEventListener('input',()=>updateEditPreview()));
-  window.addEventListener('keydown',e=>{if(e.key==='Escape'){closeModal(); closePosterPicker(); closeValueModal(); closeShelfPicker(); if(els.backupMenu.classList.contains('open')){closeBackupMenu(); els.backupMenuBtn.focus();}}});
   initShelves(); restoreLastFormat();
   initBackupUi();
   populateSelects();
   if(!initRemoteScan()) showCollectionView();   // a phone paired through a QR code shows only the remote scanner: no collection render, no cover lookups
+  initDialogs();   // Escape, Tab and Back for every dialog (after the first screen is chosen: the Back button's first entry names it)
 }
 function showCollectionView(){
   if (window.matchMedia('(max-width: 720px)').matches) showScreen('add');
   renderFresh();
   updateBlueprintPreview();
   offerOldCoverCheck();
+}
+
+/* ---------- Dialog stack: Escape, focus, Back button ----------
+   Every dialog (a .modal shown with the class "active") and the Backup ▾ menu report to dialogOpened() / dialogClosed() from their open and close
+   functions. Only the topmost one reacts to Escape and Back; Tab stays inside it, everything behind it is inert and does not scroll, and focus goes
+   back to the control that opened it. A .modal that becomes active without reporting (a new dialog) is picked up by the observer in initDialogs. */
+const dialogStack=[];   // open dialogs, topmost last: {el, modal, close(how), opener}; how = 'escape' | 'back' | 'tab'
+let inertEls=[], editBase=null;   // editBase: the Movie details fields as they were when it opened (unsaved changes = a field differs)
+const FOCUSABLE='a[href],button:not([disabled]),input:not([disabled]):not([type="hidden"]),select:not([disabled]),textarea:not([disabled]),summary,[tabindex]:not([tabindex="-1"])';
+function touchUi(){return window.matchMedia('(pointer:coarse)').matches;}   // phones and tablets: a dialog does not focus a text field (that pops up the keyboard) unless typing is its purpose
+function topDialog(){return dialogStack[dialogStack.length-1]||null;}
+function visibleEl(el){return el.checkVisibility ? el.checkVisibility() : el.getClientRects().length>0;}   // (false inside a closed <details> too)
+function focusables(root){return [...root.querySelectorAll(FOCUSABLE)].filter(el=>el.tabIndex>=0 && visibleEl(el));}
+// opts: close(how) = what Escape and Back do, focus = the control to focus, modal:false = a menu (nothing inert, no focus trap, focus stays put)
+function dialogOpened(el, opts={}){
+  if(!el || dialogStack.some(d=>d.el===el)) return;
+  const a=document.activeElement, modal=opts.modal!==false;
+  dialogStack.push({el, modal, close:opts.close || (()=>defaultDialogClose(el)), opener:a && a!==document.body ? a : null});
+  dialogLayersChanged();
+  if(modal) focusInto(el, opts.focus);
+  histSync();
+}
+function dialogClosed(el){
+  const i=dialogStack.findIndex(d=>d.el===el); if(i<0) return;
+  const d=dialogStack.splice(i,1)[0], a=document.activeElement;
+  dialogLayersChanged();
+  if(d.modal && (!a || a===document.body || el.contains(a))){   // focus was in the closed dialog: back to its opener, else into the dialog now on top
+    const o=d.opener, top=topDialog();
+    if(o && o.isConnected && !o.closest('[inert]') && !els.toast.contains(o) && visibleEl(o)) o.focus({preventScroll:true});
+    else if(top && top.modal) focusInto(top.el);
+  }
+  histSync();
+}
+function defaultDialogClose(el){const b=el.querySelector('[id$="CloseBtn"],[id$="CancelBtn"]'); if(b) b.click(); else el.classList.remove('active');}
+function focusInto(el, want){
+  const list=focusables(el), field=list.find(f=>/^(INPUT|SELECT|TEXTAREA)$/.test(f.tagName)), btn=el.querySelector('[id$="CloseBtn"],[id$="CancelBtn"]');
+  for(const f of [want, touchUi() ? btn : field, list[0], el]) if(f){f.focus({preventScroll:true}); if(document.activeElement===f) return;}
+}
+// Everything but the topmost modal dialog (and the toast, whose Undo must stay usable) is made inert; the page behind stops scrolling.
+function dialogLayersChanged(){
+  inertEls.forEach(e=>e.inert=false); inertEls=[];
+  const top=[...dialogStack].reverse().find(d=>d.modal), root=document.documentElement;
+  if(top && !root.classList.contains('dialogOpen')) root.style.setProperty('--scrollbarW', (window.innerWidth-root.clientWidth)+'px');   // keeps the page from shifting when its scrollbar goes
+  root.classList.toggle('dialogOpen', !!top);
+  for(let el=top && top.el; el && el.parentElement && el!==document.body; el=el.parentElement)
+    for(const sib of el.parentElement.children) if(sib!==el && sib!==els.toast && !sib.inert && !/^(SCRIPT|STYLE|LINK)$/.test(sib.tagName)){sib.inert=true; inertEls.push(sib);}
+}
+function onDialogKey(e){
+  const top=topDialog(); if(!top || e.defaultPrevented || e.isComposing) return;   // (Escape in the shelf rename box is stopped before it gets here)
+  if(e.key==='Escape'){e.preventDefault(); top.close('escape');}
+  else if(e.key==='Tab' && top.modal) trapTab(e, top.el);
+}
+function trapTab(e, el){
+  const f=focusables(el), a=document.activeElement;
+  if(els.toast.classList.contains('show')) f.push(...focusables(els.toast));
+  if(!f.length){e.preventDefault(); el.focus(); return;}
+  const i=f.indexOf(a), last=f.length-1;
+  if(i<0 && a!==el && el.contains(a)) return;   // somewhere inside that is not in the list: the browser knows best
+  const next = i<0 ? f[e.shiftKey ? last : 0] : e.shiftKey && i===0 ? f[last] : !e.shiftKey && i===last ? f[0] : null;
+  if(next){e.preventDefault(); next.focus();}
+}
+/* Back button. One history entry per open dialog (state.layers = how many are open there), so Back closes the topmost one instead of leaving the app;
+   a dialog closed on the page drops its entry again with history.go(-n). A tab click adds an entry too (state.prev = the tab below it), so Back returns
+   to the previous tab, and clicking the tab below goes back instead of piling up entries. The URL is never changed (remote-scan.js reads ?pair= itself). */
+let histOn=false, histBusy=false, histPopping=false, histLayers=0, histTab=null;   // histLayers: dialog entries above the screen entry we are on; histBusy: our own go(-n) is under way
+function initHistory(){
+  try{
+    const s=history.state;
+    if(s && s.mv && s.layers>0) histLayers=s.layers;   // reloaded while a dialog was open: histSync steps back over its stale entries
+    else if(s && s.mv && s.prev===activeScreen){histBusy=true; history.back();}   // reloaded on another tab: the app starts on the tab of the entry below
+    else history.replaceState({mv:1, screen:activeScreen, prev:s && s.mv ? s.prev : '', layers:0}, '');
+    histOn=true;
+  }catch(_){histBusy=false; return;}
+  window.addEventListener('popstate', onPopState);
+  histSync();
+}
+function histSync(){   // makes the history entries match the open dialogs
+  if(!histOn || histBusy || histPopping) return;
+  const want=dialogStack.length;
+  try{
+    if(histLayers>want){histBusy=true; history.go(want-histLayers); return;}   // onPopState finishes it
+    while(histLayers<want){history.pushState({mv:1, screen:activeScreen, layers:histLayers+1}, ''); histLayers++;}
+  }catch(_){histBusy=false; histOn=false; return;}   // (Safari limits history calls: rather no Back handling than a count that could step out of the app)
+  histNote();
+}
+function histNote(){   // the entry we are on names the screen shown (also after a change that is not a tab click, e.g. leaving Remote scanner mode)
+  const s=history.state;
+  if(histOn && !histBusy && !histLayers && s && s.mv && s.screen!==activeScreen) try{history.replaceState({...s, screen:activeScreen}, '');}catch(_){}
+}
+function goToTab(screen){   // a tab click or arrow key
+  dialogStack.filter(d=>!d.modal).forEach(d=>d.close('tab'));   // the Backup menu
+  histTabEntry(screen, activeScreen);
+  showScreen(screen);
+}
+function histTabEntry(screen, from){
+  if(!histOn || screen===from || dialogStack.length) return;
+  if(histBusy || histLayers){histTab={screen, from}; return;}   // after our own go(-n), see onPopState
+  const s=history.state;
+  try{
+    if(s && s.mv && s.prev===screen){histBusy=true; history.back();}
+    else history.pushState({mv:1, screen, prev:from, layers:0}, '');
+  }catch(_){histBusy=false;}
+}
+function isTabScreen(screen){return [...document.querySelectorAll('.tab')].some(t=>t.dataset.screen===screen);}
+function onPopState(e){
+  const s=e.state && e.state.mv ? e.state : {layers:0};
+  histLayers=s.layers||0;
+  if(histBusy){
+    histBusy=false;
+    const t=histTab; histTab=null;
+    if(t && t.screen===activeScreen) histTabEntry(t.screen, t.from);
+    histSync(); return;
+  }
+  histPopping=true;   // Back (or Forward): close what is above this entry, topmost first. A dialog may stay open (unsaved changes): histSync then puts its entry back.
+  try{while(dialogStack.length>histLayers){const top=topDialog(); top.close('back'); if(topDialog()===top) break;}}
+  finally{histPopping=false;}
+  if(!dialogStack.length && s.screen && s.screen!==activeScreen && isTabScreen(s.screen) && !document.body.classList.contains('remoteMode')) showScreen(s.screen);
+  histSync();
+}
+function initDialogs(){
+  window.addEventListener('keydown', onDialogKey);
+  const watch=new MutationObserver(recs=>recs.forEach(r=>{
+    const el=r.target, on=el.classList.contains('active'), known=dialogStack.some(d=>d.el===el);
+    if(on && !known) dialogOpened(el); else if(!on && known) dialogClosed(el);
+  }));
+  document.querySelectorAll('.modal').forEach(m=>{
+    m.tabIndex=-1;   // a click on empty space in the dialog keeps focus inside it
+    m.addEventListener('mousedown',e=>{if(e.target===m) e.preventDefault();});   // so does a click on the backdrop (e.g. the 2nd click of a double-click on the value tile)
+    watch.observe(m,{attributes:true, attributeFilter:['class']});
+  });
+  const tabs=[...document.querySelectorAll('.tab')];   // Left / Right / Home / End move between the tabs (roving tabindex, see showScreen)
+  tabs.forEach((t,i)=>t.addEventListener('keydown',e=>{
+    const j={ArrowRight:(i+1)%tabs.length, ArrowLeft:(i+tabs.length-1)%tabs.length, Home:0, End:tabs.length-1}[e.key];
+    if(j===undefined) return;
+    e.preventDefault(); tabs[j].focus(); goToTab(tabs[j].dataset.screen);
+  }));
+  initHistory();
 }
 
 function escapeHtml(str=''){return String(str).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
@@ -116,21 +253,24 @@ function toast(msg,ms=2600,opts={}){
 function showScreen(screen){
   activeScreen=screen;
   document.querySelectorAll('.screen').forEach(s=>s.classList.toggle('active',s.id===screen));
-  document.querySelectorAll('.tab').forEach(btn=>btn.setAttribute('aria-selected', btn.dataset.screen===screen ? 'true':'false'));
+  document.querySelectorAll('.tab').forEach(btn=>{const on=btn.dataset.screen===screen; btn.setAttribute('aria-selected', on ? 'true':'false'); btn.tabIndex=on ? 0 : -1;});   // roving tabindex: Tab reaches the selected tab, arrow keys the others
   if(screen==='export') updateBlueprintPreview();
   if(screen==='add'){updateTitleDupes(); onAddScreenShown();}   // (remote-scan.js: the computer starts its phone-pairing session here)
   if(typeof rsRender==='function') rsRender();   // the phone-scanner pill is hidden on Add / scan and shown elsewhere
   if(screen!=='library' && selectMode) setSelectMode(false);
   if(screen==='library') requestAnimationFrame(setupVisibleCoverAutoload);
+  histNote();
 }
 function toggleBackupMenu(){
-  const open=!els.backupMenu.classList.contains('open');
-  els.backupMenu.classList.toggle('open', open);
-  els.backupMenuBtn.setAttribute('aria-expanded', open?'true':'false');
+  if(els.backupMenu.classList.contains('open')){closeBackupMenu(); return;}
+  els.backupMenu.classList.add('open');
+  els.backupMenuBtn.setAttribute('aria-expanded','true');
+  dialogOpened(els.backupMenu, {modal:false, close:how=>{closeBackupMenu(); if(how==='escape') els.backupMenuBtn.focus();}});
 }
 function closeBackupMenu(){
   els.backupMenu.classList.remove('open');
   els.backupMenuBtn.setAttribute('aria-expanded','false');
+  dialogClosed(els.backupMenu);
 }
 function allShelves(){return [...new Set([...state.sectionOrder, UNSORTED_SECTION])];}   // every shelf in sectionOrder (the Shelves dialog sets that order)
 function populateSelects(){
@@ -460,6 +600,17 @@ function openEdit(id){
   updateEditPreview();
   $('editAdvanced').open=false;
   els.editModal.classList.add('active');
+  editBase=editValues();
+  dialogOpened(els.editModal, {close:requestCloseEdit, focus:touchUi() ? els.closeModalBtn : els.editMovieTitle});
+}
+// Every field of the dialog (also ones added later), so "unsaved changes" needs no list of its own.
+function editValues(){return new Map([...els.editModal.querySelectorAll('input,select,textarea')].map(f=>[f, f.type==='checkbox' || f.type==='radio' ? f.checked : f.value]));}
+function editChanged(){if(!editBase) return false; for(const [f,v] of editValues()) if(editBase.has(f) && editBase.get(f)!==v) return true; return false;}
+// Close, Escape and Back ask before unsaved changes are thrown away; Save and Delete close without asking.
+function requestCloseEdit(){
+  const m=state.movies.find(x=>x.id===editingId);
+  if(editChanged() && !confirm(`Discard your unsaved changes to “${m ? m.title : 'this movie'}”?`)) return;
+  closeModal();
 }
 function updateEditPreview(){
   if(!els.editPreview) return;
@@ -483,7 +634,7 @@ function formatAdded(iso){   // "2026-05-14" -> "14 May 2026"
   const d=new Date(iso+'T00:00:00');
   return isNaN(d) ? String(iso) : d.toLocaleDateString('en-GB',{day:'numeric', month:'short', year:'numeric'});
 }
-function closeModal(){els.editModal.classList.remove('active'); editingId=null;}
+function closeModal(){els.editModal.classList.remove('active'); editingId=null; editBase=null; dialogClosed(els.editModal);}
 function saveEdit(){
   const m=state.movies.find(x=>x.id===editingId); if(!m) return;
   const title=els.editMovieTitle.value.trim(); if(!title){toast('Movie needs a title.'); return;}
@@ -583,9 +734,9 @@ function openShelfPicker(ids){
   els.shelfNewInput.value='';
   onShelfChoice();
   els.shelfModal.classList.add('active');
-  setTimeout(()=>els.shelfSelect.focus(),50);
+  dialogOpened(els.shelfModal, {close:closeShelfPicker, focus:els.shelfSelect});
 }
-function closeShelfPicker(){els.shelfModal.classList.remove('active'); shelfIds=[];}
+function closeShelfPicker(){els.shelfModal.classList.remove('active'); shelfIds=[]; dialogClosed(els.shelfModal);}
 function onShelfChoice(){
   const isNew=els.shelfSelect.value==='__new__';
   els.shelfNewField.hidden=!isNew;
@@ -640,19 +791,19 @@ function initShelves(){
   els.shelvesModal.addEventListener('click',e=>{if(e.target===els.shelvesModal) closeShelves();});
   els.shelvesList.addEventListener('click', onShelvesClick);
   els.shelvesList.addEventListener('change', onShelvesChange);
-  els.shelvesList.addEventListener('keydown', onShelvesKey);
-  window.addEventListener('keydown',e=>{if(e.key==='Escape' && els.shelvesModal.classList.contains('active')) closeShelves();});   // (Escape inside the rename box only cancels the rename, see onShelvesKey)
+  els.shelvesList.addEventListener('keydown', onShelvesKey);   // (Escape inside the rename box only cancels the rename: it never reaches onDialogKey)
   els.blueprintShelf.addEventListener('change', updateBlueprintPreview);
 }
 function restoreLastFormat(){const f=vaultGet(LAST_FORMAT_KEY); if(f && KNOWN_FORMATS.includes(f)) els.newFormat.value=f;}
 function openShelves(){
   renamingShelf=-1; renderShelves();
   els.shelvesModal.classList.add('active');
-  setTimeout(()=>els.shelvesCloseBtn.focus({preventScroll:true}),30);
+  dialogOpened(els.shelvesModal, {close:closeShelves, focus:els.shelvesCloseBtn});
 }
 function closeShelves(){
   if(!els.shelvesModal.classList.contains('active')) return;
   els.shelvesModal.classList.remove('active'); renamingShelf=-1;
+  dialogClosed(els.shelvesModal);   // (first: the page behind is inert until then)
   els.shelvesBtn.focus({preventScroll:true});
 }
 // focus = {i, sh}: the control to focus again after the list is rebuilt (if it is disabled now, the next best button in that row)
@@ -781,9 +932,9 @@ function openValueModal(){
   els.valueAmount.value=''; els.valueNote.value=''; els.valueMode.value='add'; els.valueConfirm.checked=false;
   els.valueModal.classList.add('active');
   renderValueHistory(); updateValuePreview();
-  setTimeout(()=>els.valueAmount.focus(),50);
+  dialogOpened(els.valueModal, {close:closeValueModal, focus:els.valueAmount});   // typing an amount is what this dialog is for, so its field is focused on phones too
 }
-function closeValueModal(){els.valueModal.classList.remove('active');}
+function closeValueModal(){els.valueModal.classList.remove('active'); dialogClosed(els.valueModal);}
 function updateValuePreview(){
   const current=Number(state.collectionValue || 0);
   const amount=parseMoneyInput(els.valueAmount.value);

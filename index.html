@@ -49,13 +49,13 @@
     </div>
   </header>
 
-  <nav class="tabs" role="tablist">
-    <button class="tab" data-screen="library" aria-selected="true">Collection</button>
-    <button class="tab" data-screen="add" aria-selected="false">Add / scan</button>
-    <button class="tab" data-screen="export" aria-selected="false">Blueprint export</button>
+  <nav class="tabs" role="tablist" aria-label="Screens">
+    <button class="tab" id="tabLibrary" role="tab" data-screen="library" aria-controls="library" aria-selected="true">Collection</button>
+    <button class="tab" id="tabAdd" role="tab" data-screen="add" aria-controls="add" aria-selected="false" tabindex="-1">Add / scan</button>
+    <button class="tab" id="tabExport" role="tab" data-screen="export" aria-controls="export" aria-selected="false" tabindex="-1">Blueprint export</button>
   </nav>
 
-  <main id="library" class="screen active">
+  <main id="library" class="screen active" role="tabpanel" aria-labelledby="tabLibrary">
     <section class="stats" aria-label="Collection stats">
       <div class="stat" id="totalStat"><small id="totalLabel">Total titles</small><strong id="totalCount">0</strong></div>
       <div class="stat clickable" id="duplicatesStat" role="button" tabindex="0" aria-pressed="false" title="Click to show only titles you own multiple copies of"><small>Duplicates</small><strong id="duplicateCount">0</strong><span class="micro" id="duplicateMicro">Click to filter</span></div>
@@ -81,7 +81,7 @@
     <div id="gridSentinel" class="gridSentinel" aria-hidden="true"></div>
   </main>
 
-  <main id="add" class="screen">
+  <main id="add" class="screen" role="tabpanel" aria-labelledby="tabAdd">
     <section class="addWrap">
       <div class="panel rsQueuePanel" id="rsQueuePanel" hidden>
         <div class="rsQueueHead">
@@ -180,7 +180,7 @@
     </section>
   </main>
 
-  <main id="export" class="screen">
+  <main id="export" class="screen" role="tabpanel" aria-labelledby="tabExport">
     <section class="panel">
       <h2>Blueprint-style export</h2>
       <p>This export groups your saved movies by section and keeps the old collection-list feel: title header, section names and star bullets. Exported HTML can be opened in Word or printed to PDF.</p>
