@@ -162,6 +162,25 @@ Trengs bare hvis den innebygde nøkkelen slutter å virke (appen sier da fra med
 
 TMDB krever kildehenvisning: *This product uses the TMDB API but is not endorsed or certified by TMDB.*
 
+## Tester
+
+Mappa `tests/e2e/` inneholder automatiske tester. De fleste åpner appen i en ekte nettleser (Chromium, styrt av Playwright), både med PC- og mobilskjerm, og sjekker at det viktigste virker: oppstart uten feil og at startlista lastes, søket («daddys home», «spiderman», «godfather 2»), legge til, endre, slette og angre, sett/ikke sett, **Select** → «Move to shelf…» og angre, hylleoversikten (endre navn, slå sammen, angre), Backup (eksport, import med **Merge** og **Replace all**, «Undo last import») og blueprint for én hylle. I tillegg testes noen rene hjelpefunksjoner (strekkodesjekk, migrering av gamle lagringer, sammenslåing ved import), serverfunksjonen `api/barcode.js` med falske svar fra upcitemdb og Open Product Facts, og alle `.js`-filer sjekkes med `node --check`.
+
+Testene går aldri ut på nett: en liten innebygd webserver serverer repoet på en tilfeldig port, og alt annet (coverbilder, strekkodeoppslag, ntfy.sh) blokkeres. En test feiler hvis siden får en JavaScript-feil.
+
+Kjøre lokalt (Node 20 eller nyere):
+
+```
+cd tests
+npm ci
+npx playwright install chromium   # bare første gang (på Linux eventuelt med --with-deps)
+npm test
+```
+
+Det tar under ett minutt. Verktøyene ligger i `tests/` med egen `package.json`, ikke i rotmappa, slik at Vercel fortsatt bare serverer filene uten byggesteg. `tests/cover-audit/` er en egen manuell testside og er ikke med i `npm test`.
+
+**CI.** `.github/workflows/ci.yml` kjører testene på GitHub Actions ved hver push og pull request (Ubuntu, Node 20): `npm ci` i `tests/`, `npx playwright install --with-deps chromium` og `npm test`. Resultatet vises som grønn hake eller rødt kryss ved commiten og i pull requesten.
+
 ## Filoversikt
 
 ```
@@ -180,6 +199,8 @@ js/app.js              Tilstand, oppstart, visning av kort, redigering og verdi
 js/pwa.js              Registrerer service workeren (bare på http/https, ikke fra fil)
 icons/                 Appikonet (icon.svg og de ferdige PNG-filene)
 tests/cover-audit/     Fasit og testside for automatiske plakater (se «Sjekke at plakatene blir riktige»)
+tests/e2e/             Automatiske tester (Playwright + node --test), kjøres med npm test i tests/ (se «Tester»)
+.github/workflows/     CI: kjører testene på GitHub Actions ved push og pull request
 ```
 
 Skriptene er vanlige `<script>`-tagger (ikke moduler) som lastes i den rekkefølgen som står i `index.html`, slik at appen også virker når `index.html` åpnes direkte fra disk. `js/pwa.js` lastes sist.

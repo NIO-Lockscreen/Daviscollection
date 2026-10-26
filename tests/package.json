@@ -1,0 +1,16 @@
+{
+  "name": "movie-vault-tests",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Automated browser and unit tests for Movie Vault (Playwright library + node --test). Kept in tests/ so the repo root has no package.json and Vercel serves the app as plain static files.",
+  "license": "UNLICENSED",
+  "scripts": {
+    "test": "node --test e2e/*.test.js"
+  },
+  "devDependencies": {
+    "playwright": "1.63.0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
