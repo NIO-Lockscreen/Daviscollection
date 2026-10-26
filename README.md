@@ -78,7 +78,7 @@ GitHub-repoet har `https://daviscollection.vercel.app` som hjemmeside, og siden 
 
 - **Oppdatering skjer automatisk.** Når du pusher eller merger til `main`, lager Vercel en ny utgave av siden av seg selv, vanligvis på under ett minutt. Det er ingenting å bygge: filene serveres akkurat som de ligger i repoet.
 - **Serverfunksjonen.** Mappa `api/` inneholder én serverfunksjon (`api/barcode.js`, strekkodeoppslaget). Vercel finner den selv og publiserer den på `/api/barcode`, uten noe oppsett eller nøkler.
-- **Ingen `vercel.json` er nødvendig.** Vercel sender `Cache-Control: public, max-age=0, must-revalidate` for statiske filer, så nettleseren sjekker alltid om det finnes en nyere versjon. Service workeren (`sw.js`) henter dessuten alltid ferske filer når du er på nett.
+- **Ingen `vercel.json` er nødvendig.** Vercel sender `Cache-Control: public, max-age=0, must-revalidate` for statiske filer, så nettleseren sjekker alltid om det finnes en nyere versjon. Service workeren (`sw.js`) henter dessuten alltid ferske filer når du er på nett (på svært tregt nett starter appen fra den lagrede kopien etter ca. 3 sekunder, se «Oppdateringer og cache-versjon»).
 - **Hvis en endring ikke dukker opp:** åpne prosjektet i Vercel-dashboardet og sjekk at siste deployment under «Deployments» er «Ready», og at Production Branch er `main`. Under Settings → Build and Deployment skal Framework Preset være «Other», og Output Directory skal stå tom (siden ligger i rotmappa).
 
 ### Alternativ: GitHub Pages
@@ -184,8 +184,8 @@ Skriptene er vanlige `<script>`-tagger (ikke moduler) som lastes i den rekkeføl
 
 ### Oppdateringer og cache-versjon
 
-Service workeren henter alltid filene fra nettet først, og bruker den lagrede kopien bare når du er uten nett. Når du publiserer en endring og åpner appen på nett, får du derfor den nye versjonen med det samme (på installert app: lukk og åpne den én gang, eller last siden på nytt). Dataene dine i nettleseren påvirkes ikke av oppdateringer.
+Service workeren henter alltid filene fra nettet først, og bruker den lagrede kopien når du er uten nett, eller når nettet er så tregt at siden ikke har kommet etter ca. 3 sekunder (`NETWORK_TIMEOUT_MS` i `sw.js`). Da starter appen fra den lagrede kopien (alle filene fra samme versjon), mens nedlastingen fortsetter i bakgrunnen og oppdaterer kopien til neste oppstart. Kommer siden fra nettet, venter den også på skriptene fra nettet, så ny og gammel versjon blandes aldri. Når du publiserer en endring og åpner appen på nett, får du derfor den nye versjonen med det samme (på installert app: lukk og åpne den én gang, eller last siden på nytt; på svært tregt nett kommer den ved neste oppstart). Dataene dine i nettleseren påvirkes ikke av oppdateringer.
 
-Skal du tvinge alle installerte kopier til å laste ned alt på nytt, endrer du `CACHE_VERSION` øverst i `sw.js` (for eksempel fra `'v1'` til `'v2'`). Den nye service workeren henter da alle filer på nytt og sletter den gamle cachen. Legger du til en ny fil i appen (for eksempel et nytt skript i `js/`), tar du den også med i `SHELL`-lista i `sw.js` og øker versjonen, slik at den er tilgjengelig uten nett fra første stund.
+Skal du tvinge alle installerte kopier til å laste ned alt på nytt, endrer du `CACHE_VERSION` øverst i `sw.js` (for eksempel fra `'v5'` til `'v6'`). Den nye service workeren henter da alle filer på nytt og sletter den gamle cachen. Legger du til en ny fil i appen (for eksempel et nytt skript i `js/`), tar du den også med i `SHELL`-lista i `sw.js` og øker versjonen, slik at den er tilgjengelig uten nett fra første stund. `js/seed-data.js` skal stå i `SHELL` selv om den bare lastes første gang, så også en første oppstart virker uten nett.
 
 Ikonene er laget ut fra `icons/icon.svg` (vanlig ikon) og `icons/icon-maskable.svg` (full-bleed, brukes til maskable-ikonet og iPhone-ikonet).
