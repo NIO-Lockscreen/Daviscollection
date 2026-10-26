@@ -5,7 +5,7 @@ const UNSORTED_SECTION = 'UNSORTED / NOT PLACED';
 function isToBeSorted(section){return section===UNSORTED_SECTION || state.toSortShelves.includes(section);}
 const TOSORT_FILTER = '__tosort__';   // pseudo value of the Section filter: every shelf that is still waiting to be sorted
 const LAST_FORMAT_KEY = 'movieVault.lastFormat';
-const formats = ['All formats','4K UHD','4K Steelbook','Blu-ray','DVD','TV / Series','Blu-ray / DVD','Box set'];
+const formats = ['All formats', ...KNOWN_FORMATS];   // KNOWN_FORMATS (storage.js) is the one list of formats; fillFormatSelects() builds the Add / Movie details pickers from it
 const els = {};
 let state = loadState();
 let activeScreen = 'library';
@@ -644,7 +644,8 @@ function initShelves(){
   window.addEventListener('keydown',e=>{if(e.key==='Escape' && els.shelvesModal.classList.contains('active')) closeShelves();});   // (Escape inside the rename box only cancels the rename, see onShelvesKey)
   els.blueprintShelf.addEventListener('change', updateBlueprintPreview);
 }
-function restoreLastFormat(){const f=vaultGet(LAST_FORMAT_KEY); if(f && KNOWN_FORMATS.includes(f)) els.newFormat.value=f;}
+function fillFormatSelects(){const html=KNOWN_FORMATS.map(f=>`<option value="${escapeHtml(f)}">${escapeHtml(f)}</option>`).join(''); els.newFormat.innerHTML=html; els.editFormat.innerHTML=html;}   // the Format pickers of the Add form and Movie details (empty in index.html)
+function restoreLastFormat(){fillFormatSelects(); const f=vaultGet(LAST_FORMAT_KEY); if(f && KNOWN_FORMATS.includes(f)) els.newFormat.value=f;}   // runs once from init(): the options must exist before the last format is picked
 function openShelves(){
   renamingShelf=-1; renderShelves();
   els.shelvesModal.classList.add('active');
